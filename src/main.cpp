@@ -32,6 +32,9 @@ Camera camera(glm::vec3(0.0f, 6.0f, 12.0f));
 // Game state
 bool gameOver = false;
 int score = 0;
+float lastCarSpawnZ = 0.0f; // Track Z position where we last spawned cars
+const float CAR_SPAWN_INTERVAL = 15.0f; // Spawn new cars every 15 units forward
+const float CAR_DESPAWN_DISTANCE = 80.0f; // Remove cars that are far behind
 
 // Function declarations
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -124,7 +127,7 @@ int main()
     std::cout << "SPACE - Jump" << std::endl;
     std::cout << "LEFT SHIFT - Speed Boost (5 sec)" << std::endl;
     std::cout << "ESC - Exit" << std::endl;
-    std::cout << "Goal: Cross the road without getting hit!" << std::endl;
+    std::cout << "Goal: Survive as long as possible!" << std::endl;
     std::cout << "======================" << std::endl;
 
     // Game loop
@@ -142,25 +145,58 @@ int main()
         if (!gameOver) {
             player->Update(deltaTime);
 
-            // Update cars
-            for (auto car : cars) {
-                car->Update(deltaTime);
+            // Spawn new cars as player moves forward
+            if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
+                lastCarSpawnZ = player->position.z;
+                
+                // Spawn 2-3 new cars at different lanes (reduced from 3-5)
+                int numNewCars = 2 + (rand() % 2); // 2-3 cars
+                for (int i = 0; i < numNewCars; ++i) {
+                    int lane = (i % NUM_LANES) - 2; // Lanes from -2 to 2
+                    bool movingRight = (rand() % 2 == 0);
+                    Car* newCar = new Car(lane, LANE_WIDTH, movingRight);
+                    
+                    // Spawn further ahead to avoid pop-in
+                    if (movingRight) {
+                        newCar->position.x = -35.0f + (i * 10.0f);
+                    } else {
+                        newCar->position.x = 35.0f - (i * 10.0f);
+                    }
+                    newCar->position.z = player->position.z - 50.0f; // Spawn further ahead
+                    newCar->position.y = 0.3f + (lane * 0.1f);
+                    
+                    cars.push_back(newCar);
+                }
+                std::cout << "New cars spawned! Total cars: " << cars.size() << std::endl;
+            }
+
+            // Update cars and remove ones that are too far behind
+            // Use reverse iterator to safely remove elements
+            for (int i = (int)cars.size() - 1; i >= 0; --i) {
+                cars[i]->Update(deltaTime);
 
                 // Check collision with player
-                if (player->CheckCollision(car)) {
+                if (player->CheckCollision(cars[i])) {
                     gameOver = true;
                     std::cout << "\n=== GAME OVER ===" << std::endl;
                     std::cout << "You got hit by a car!" << std::endl;
                     std::cout << "Final Score: " << score << std::endl;
                     std::cout << "Press ESC to exit" << std::endl;
                 }
+                
+                // Remove cars that are too far behind (cleanup)
+                if (cars[i]->position.z > player->position.z + CAR_DESPAWN_DISTANCE) {
+                    delete cars[i];
+                    cars.erase(cars.begin() + i);
+                }
             }
 
             // Update score based on forward progress
-            // คะแนนเพิ่มเมื่อเดินไปข้างหน้า (Z ลดลง)
-            if (player->position.z < -score * 2.0f) {
-                score++;
-                std::cout << "Score: " << score << std::endl;
+            // คะแนนเพิ่มเมื่อเดินไปข้างหน้า (Z ลดลง) - ไม่มีขีดจำกัด
+            int newScore = static_cast<int>(-player->position.z / 2.0f);
+            if (newScore > score) {
+                score = newScore;
+                std::cout << "Distance: " << score * 2 << " meters | Cars active: " << cars.size() << std::endl;
             }
 
             // Camera follows player
@@ -175,7 +211,7 @@ int main()
         shader.use();
 
         // View/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 200.0f);
         glm::mat4 view = camera.GetViewMatrix();
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
@@ -220,9 +256,10 @@ int main()
 
     // Cleanup
     delete player;
-    for (auto car : cars) {
-        delete car;
+    for (size_t i = 0; i < cars.size(); ++i) {
+        delete cars[i];
     }
+    cars.clear();
     glDeleteVertexArrays(1, &groundVAO);
     glDeleteTextures(1, &streetTexture);
 
@@ -289,15 +326,17 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 unsigned int createGroundPlane()
 {
     // Create a large ground plane with texture coordinates
+    // Much larger for infinite game feel
+    float size = 500.0f;
     float groundVertices[] = {
         // positions                texCoords        
-        -50.0f, 0.0f, -50.0f,      0.0f, 0.0f,
-         50.0f, 0.0f, -50.0f,      10.0f, 0.0f,
-         50.0f, 0.0f,  50.0f,      10.0f, 10.0f,
+        -size, 0.0f, -size,        0.0f, 0.0f,
+         size, 0.0f, -size,        10.0f * (size / 50.0f), 0.0f,
+         size, 0.0f,  size,        10.0f * (size / 50.0f), 10.0f * (size / 50.0f),
 
-         50.0f, 0.0f,  50.0f,      10.0f, 10.0f,
-        -50.0f, 0.0f,  50.0f,      0.0f, 10.0f,
-        -50.0f, 0.0f, -50.0f,      0.0f, 0.0f,
+         size, 0.0f,  size,        10.0f * (size / 50.0f), 10.0f * (size / 50.0f),
+        -size, 0.0f,  size,        0.0f, 10.0f * (size / 50.0f),
+        -size, 0.0f, -size,        0.0f, 0.0f,
     };
 
     unsigned int VBO, VAO;
