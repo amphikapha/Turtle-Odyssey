@@ -131,7 +131,7 @@ int main()
     
     // Store textures in array for easy access
     unsigned int groundTextures[3] = { streetTexture, grassTexture, lakeTexture };
-    const float TEXTURE_ZONE_SIZE = 10.0f; // Each zone is 10 units (faster cycling)
+    const float TEXTURE_ZONE_SIZE = 20.0f; // Each zone is 20 units
     int currentTextureZone = 0;
 
     // Lighting
@@ -243,13 +243,32 @@ int main()
         shader.setVec3("lightColor", lightColor);
         shader.setVec3("viewPos", camera.Position);
 
-        // Bind current ground texture based on zone
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, groundTextures[currentTextureZone]);
-        shader.setInt("ourTexture", 0);
-
-        // Render ground
-        renderGround(groundVAO, &shader, view, projection);
+        // Render multiple ground sections with different textures
+        // This creates a continuous visible transition between terrain types
+        const float SECTION_SIZE = 20.0f; // Size of each ground section (matches TEXTURE_ZONE_SIZE)
+        
+        // Render 9 sections: 4 behind, 1 current, 4 ahead
+        // This ensures the player never sees sky cutting off the ground
+        for (int i = -4; i <= 4; ++i) {
+            int zoneIndex = currentTextureZone + i;
+            int textureIndex = ((zoneIndex % 3) + 3) % 3; // Handle negative modulo
+            
+            // Bind texture for this section
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, groundTextures[textureIndex]);
+            shader.setInt("ourTexture", 0);
+            
+            // Position this ground section
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, -i * SECTION_SIZE));
+            shader.setMat4("model", model);
+            shader.setVec3("objectColor", glm::vec3(1.0f, 1.0f, 1.0f)); // White - let texture show
+            
+            // Render this section
+            glBindVertexArray(groundVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
+        }
 
         // Bind default texture unit for other objects (will use white if no texture loaded)
         glActiveTexture(GL_TEXTURE0);
@@ -350,18 +369,25 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 unsigned int createGroundPlane()
 {
-    // Create a large ground plane with texture coordinates
-    // Much larger for infinite game feel
-    float size = 500.0f;
+    // Create a ground section (20 units long for terrain transitions)
+    // Each section will be rendered multiple times at different Z positions
+    float width = 500.0f;   // Wide enough for all lanes
+    float depth = 20.0f;    // Length of one section (matches SECTION_SIZE)
+    
+    // Texture coordinate scale - higher values = more tiling = smaller/more detailed textures
+    // Scale based on the actual dimensions to avoid stretching
+    float texScaleZ = 8.0f;  // Repeat texture 8 times along Z (depth)
+    float texScaleX = texScaleZ * (width / depth);  // Scale X proportionally to avoid stretching
+    
     float groundVertices[] = {
         // positions                texCoords        
-        -size, 0.0f, -size,        0.0f, 0.0f,
-         size, 0.0f, -size,        10.0f * (size / 50.0f), 0.0f,
-         size, 0.0f,  size,        10.0f * (size / 50.0f), 10.0f * (size / 50.0f),
+        -width, 0.0f, -depth,      0.0f, 0.0f,
+         width, 0.0f, -depth,      texScaleX, 0.0f,
+         width, 0.0f,  depth,      texScaleX, texScaleZ,
 
-         size, 0.0f,  size,        10.0f * (size / 50.0f), 10.0f * (size / 50.0f),
-        -size, 0.0f,  size,        0.0f, 10.0f * (size / 50.0f),
-        -size, 0.0f, -size,        0.0f, 0.0f,
+         width, 0.0f,  depth,      texScaleX, texScaleZ,
+        -width, 0.0f,  depth,      0.0f, texScaleZ,
+        -width, 0.0f, -depth,      0.0f, 0.0f,
     };
 
     unsigned int VBO, VAO;
