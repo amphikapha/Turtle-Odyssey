@@ -127,8 +127,150 @@ private:
     unsigned int getTextureForMesh(const std::string& meshName) {
         std::vector<unsigned int> textureIDs;
         
-        // Load textures for turtle models
-        if (modelPath.find("toonturtle") != std::string::npos) {
+        // Load textures for Goblin model (GoblinMutantSPDONEFINAL.fbx)
+        if (modelPath.find("goblin-3d-model-free") != std::string::npos || 
+            modelPath.find("GoblinMutant") != std::string::npos) {
+            std::cout << "DEBUG: Getting texture for goblin mesh: " << meshName << std::endl;
+            
+            std::string textureName;
+            
+            // Map mesh names to texture files based on goblin model parts
+            if (meshName.find("Body") != std::string::npos) {
+                textureName = "GoblinZBDone_Body_BaseColor.png";
+            } else if (meshName.find("Shell") != std::string::npos || meshName.find("shell") != std::string::npos) {
+                textureName = "GoblinZBDone_Shell_BaseColor.png";
+            } else if (meshName.find("WaistBand") != std::string::npos || meshName.find("waist") != std::string::npos) {
+                textureName = "GoblinZBDone_WaistBandShell_BaseColor.png";
+            } else {
+                // Default to body texture
+                textureName = "GoblinZBDone_Body_BaseColor.png";
+            }
+            
+            // Try different possible texture paths
+            std::vector<std::string> possiblePaths = {
+                directory + "/../textures/" + textureName,
+                directory + "/" + textureName,
+                "assets/goblin-3d-model-free/textures/" + textureName
+            };
+            
+            for (const auto& texturePath : possiblePaths) {
+                std::ifstream f(texturePath);
+                if (f.good()) {
+                    f.close();
+                    unsigned int textureID = loadTexture(texturePath.c_str());
+                    if (textureID != 0) {
+                        std::cout << "Successfully loaded goblin texture: " << texturePath << std::endl;
+                        return textureID;
+                    }
+                }
+                f.close();
+            }
+            
+            // Fallback: try to load any available goblin texture
+            std::vector<std::string> goblinTextures = {
+                "GoblinZBDone_Body_BaseColor.png",
+                "GoblinZBDone_Shell_BaseColor.png",
+                "GoblinZBDone_WaistBandShell_BaseColor.png"
+            };
+            
+            for (const auto& textureName : goblinTextures) {
+                std::vector<std::string> possiblePaths = {
+                    directory + "/../textures/" + textureName,
+                    directory + "/" + textureName,
+                    "assets/goblin-3d-model-free/textures/" + textureName
+                };
+                
+                for (const auto& texturePath : possiblePaths) {
+                    std::ifstream f(texturePath);
+                    if (f.good()) {
+                        f.close();
+                        unsigned int textureID = loadTexture(texturePath.c_str());
+                        if (textureID != 0) {
+                            return textureID;
+                        }
+                    }
+                    f.close();
+                }
+            }
+        }
+        // Load textures for new detailed turtle model (model.dae)
+        else if (modelPath.find("turtle/source/model") != std::string::npos) {
+            std::cout << "DEBUG: Getting texture for mesh: " << meshName << " (modelPath: " << modelPath << ")" << std::endl;
+            // Map mesh names to texture files based on material names from DAE
+            std::string textureName;
+            
+            if (meshName.find("tete") != std::string::npos || meshName.find("Object008") != std::string::npos) {
+                textureName = "tete_albedo.jpg";
+            } else if (meshName.find("carapace") != std::string::npos || meshName.find("Object009") != std::string::npos) {
+                textureName = "carapace_albedo.jpg";
+            } else if (meshName.find("yeux_langue") != std::string::npos || meshName.find("Object010") != std::string::npos) {
+                textureName = "yeux_langue_albedo.jpg";
+            } else if (meshName.find("pattes") != std::string::npos || meshName.find("Sphere") != std::string::npos) {
+                textureName = "pattes_albedo.jpg";
+            } else if (meshName.find("queue") != std::string::npos || meshName.find("Object011") != std::string::npos || 
+                       meshName.find("Object012") != std::string::npos || meshName.find("Object013") != std::string::npos ||
+                       meshName.find("Object014") != std::string::npos || meshName.find("Object015") != std::string::npos) {
+                textureName = "queue_albedo.jpg";
+            } else if (meshName.find("dessous") != std::string::npos || meshName.find("Object016") != std::string::npos) {
+                textureName = "dessous_albedo.jpg";
+            } else {
+                // Default texture
+                textureName = "tete_albedo.jpg";
+            }
+            
+            // Try different possible texture paths
+            std::vector<std::string> possiblePaths = {
+                directory + "/../textures/" + textureName,
+                "assets/turtle/textures/" + textureName,
+                "assets/turtle/source/model/model/textures/" + textureName
+            };
+            
+            for (const auto& texturePath : possiblePaths) {
+                std::ifstream f(texturePath);
+                if (f.good()) {
+                    f.close();
+                    unsigned int textureID = loadTexture(texturePath.c_str());
+                    if (textureID != 0) {
+                        std::cout << "Successfully loaded turtle texture: " << texturePath << std::endl;
+                        return textureID;
+                    }
+                }
+                f.close();
+            }
+        }
+        // Load textures for new 3D turtle model (GLB)
+        else if (modelPath.find("123b415d79b4") != std::string::npos) {
+            // Load textures from the new turtle model
+            std::vector<std::string> turtleTextures = {
+                "Image_0_0.jpeg",
+                "Image_1_1@channels=B.jpeg",
+                "Image_1_1@channels=G.jpeg"
+            };
+            
+            // Try to load first available texture
+            for (const auto& textureName : turtleTextures) {
+                std::vector<std::string> possiblePaths = {
+                    directory + "/../textures/" + textureName,
+                    directory + "/" + textureName,
+                    "assets/123b415d79b4-74f3574a4468-turtle-cartoon--3d/textures/" + textureName
+                };
+                
+                for (const auto& texturePath : possiblePaths) {
+                    std::ifstream f(texturePath);
+                    if (f.good()) {
+                        f.close();
+                        unsigned int textureID = loadTexture(texturePath.c_str());
+                        if (textureID != 0) {
+                            std::cout << "Successfully loaded turtle texture: " << texturePath << std::endl;
+                            return textureID;
+                        }
+                    }
+                    f.close();
+                }
+            }
+        }
+        // Load textures for old toon turtle models
+        else if (modelPath.find("toonturtle") != std::string::npos) {
             // Map mesh names to texture files for turtle
             std::string textureName;
             if (meshName.find("Shell") != std::string::npos) {
@@ -210,6 +352,11 @@ private:
     Mesh processMesh(aiMesh* mesh, const aiScene* scene, const std::string& nodeName) {
         std::vector<Vertex> vertices;
         std::vector<unsigned int> indices;
+
+        // Debug: print mesh info for turtle model
+        if (modelPath.find("turtle/source/model") != std::string::npos) {
+            std::cout << "Processing mesh: " << nodeName << " (mesh " << mesh << ")" << std::endl;
+        }
 
         // Process vertices
         for (unsigned int i = 0; i < mesh->mNumVertices; i++) {

@@ -20,8 +20,8 @@ public:
     Player(glm::vec3 startPos) {
         position = startPos;
         position.y = 1.2f; // Adjust height so feet are on ground (not sinking)
-        scale = glm::vec3(0.8f, 0.8f, 0.8f);
-        rotation = glm::vec3(-90.0f, 0.0f, 0.0f); // Face forward (remove Y=180 rotation)
+        scale = glm::vec3(2.0f, 2.0f, 2.0f);
+        rotation = glm::vec3(0.0f, 0.0f, 0.0f); // Face forward
         color = glm::vec3(1.0f, 1.0f, 1.0f);
         moveSpeed = 5.0f;
         jumpHeight = 2.0f;
@@ -33,8 +33,8 @@ public:
         model = nullptr;
         useModel = false;
 
-        // Try to load model
-        LoadModel("assets/toonturtle/source/ToonTurtle.fbx");
+        // Try to load goblin model
+        LoadModel("assets/goblin-3d-model-free/source/GoblinMutantSPDONEFINAL.fbx");
         
         // Fallback to cube if model not found
         if (!useModel) {
