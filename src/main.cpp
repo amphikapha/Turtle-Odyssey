@@ -13,6 +13,10 @@
 #include <vector>
 #include <ctime>
 #include <cstdlib>
+#include <fstream>
+#include <windows.h>
+#include <gdiplus.h>
+#pragma comment(lib, "gdiplus.lib")
 
 // Settings
 const unsigned int SCR_WIDTH = 1280;
@@ -48,6 +52,12 @@ int main()
 {
     // Initialize random seed
     srand(static_cast<unsigned>(time(0)));
+
+    // Initialize GDI+
+    using namespace Gdiplus;
+    GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
     // GLFW initialization
     glfwInit();
@@ -114,8 +124,15 @@ int main()
     // Create ground
     unsigned int groundVAO = createGroundPlane();
     
-    // Load street texture for ground
+    // Load three textures for ground cycling
+    unsigned int grassTexture = loadTexture("assets/textures/grass.jpg");
+    unsigned int lakeTexture = loadTexture("assets/textures/lake.png");
     unsigned int streetTexture = loadTexture("assets/textures/street.jpg");
+    
+    // Store textures in array for easy access
+    unsigned int groundTextures[3] = { streetTexture, grassTexture, lakeTexture };
+    const float TEXTURE_ZONE_SIZE = 10.0f; // Each zone is 10 units (faster cycling)
+    int currentTextureZone = 0;
 
     // Lighting
     glm::vec3 lightPos(0.0f, 20.0f, 0.0f);
@@ -144,6 +161,11 @@ int main()
         // Update
         if (!gameOver) {
             player->Update(deltaTime);
+
+            // Update ground texture zone based on player position
+            // Calculate which zone the player is in (0=street, 1=grass, 2=lake, cycles)
+            int zoneIndex = static_cast<int>(-player->position.z / TEXTURE_ZONE_SIZE);
+            currentTextureZone = zoneIndex % 3; // Cycle through 0, 1, 2
 
             // Spawn new cars as player moves forward
             if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
@@ -221,9 +243,9 @@ int main()
         shader.setVec3("lightColor", lightColor);
         shader.setVec3("viewPos", camera.Position);
 
-        // Bind street texture for ground
+        // Bind current ground texture based on zone
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, streetTexture);
+        glBindTexture(GL_TEXTURE_2D, groundTextures[currentTextureZone]);
         shader.setInt("ourTexture", 0);
 
         // Render ground
@@ -261,7 +283,10 @@ int main()
     }
     cars.clear();
     glDeleteVertexArrays(1, &groundVAO);
-    glDeleteTextures(1, &streetTexture);
+    glDeleteTextures(3, groundTextures);
+
+    // Shutdown GDI+
+    Gdiplus::GdiplusShutdown(gdiplusToken);
 
     glfwTerminate();
     return 0;
@@ -378,39 +403,96 @@ unsigned int loadTexture(const char* path)
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
-    // For now, create a simple procedural texture
-    // TODO: Replace with actual image loading
-    unsigned char* data = new unsigned char[256 * 256 * 3];
+    // Use GDI+ to load the image
+    using namespace Gdiplus;
     
-    // Fill with a checkerboard pattern to simulate street
-    for (int y = 0; y < 256; ++y) {
-        for (int x = 0; x < 256; ++x) {
-            int idx = (y * 256 + x) * 3;
-            // Create a road-like pattern with lines
-            if ((x % 32 < 2) || (y % 64 < 2)) {
-                data[idx] = 255;     // R
-                data[idx + 1] = 255; // G
-                data[idx + 2] = 255; // B (white lines)
-            } else {
-                // Gray asphalt
-                data[idx] = 80;      // R
-                data[idx + 1] = 80;  // G
-                data[idx + 2] = 80;  // B
+    // Convert char* to wchar_t*
+    int len = strlen(path);
+    wchar_t* widePath = new wchar_t[len + 1];
+    mbstowcs(widePath, path, len + 1);
+    
+    Image* image = new Image(widePath);
+    delete[] widePath;
+    
+    if (image->GetLastStatus() != Ok || image->GetWidth() == 0 || image->GetHeight() == 0) {
+        std::cout << "Warning: Failed to load image: " << path << std::endl;
+        delete image;
+        
+        // Create fallback texture - solid color based on filename
+        std::string filename(path);
+        unsigned char* data = new unsigned char[128 * 128 * 3];
+        
+        if (filename.find("street") != std::string::npos) {
+            for (int i = 0; i < 128 * 128 * 3; i += 3) {
+                data[i] = 60; data[i + 1] = 60; data[i + 2] = 60; // Gray
+            }
+        } else if (filename.find("grass") != std::string::npos) {
+            for (int i = 0; i < 128 * 128 * 3; i += 3) {
+                data[i] = 34; data[i + 1] = 139; data[i + 2] = 34; // Green
+            }
+        } else if (filename.find("lake") != std::string::npos) {
+            for (int i = 0; i < 128 * 128 * 3; i += 3) {
+                data[i] = 30; data[i + 1] = 144; data[i + 2] = 255; // Blue
             }
         }
+        
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 128, 128, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        delete[] data;
+        return textureID;
     }
-
+    
+    UINT width = image->GetWidth();
+    UINT height = image->GetHeight();
+    
+    // Create bitmap from image
+    Bitmap* bitmap = new Bitmap(width, height, PixelFormat24bppRGB);
+    Graphics* graphics = Graphics::FromImage(bitmap);
+    graphics->DrawImage(image, 0, 0);
+    delete graphics;
+    
+    // Lock bitmap bits for reading
+    BitmapData bitmapData;
+    Rect rect(0, 0, width, height);
+    bitmap->LockBits(&rect, ImageLockModeRead, PixelFormat24bppRGB, &bitmapData);
+    
+    unsigned char* pixels = static_cast<unsigned char*>(bitmapData.Scan0);
+    unsigned char* textureData = new unsigned char[width * height * 3];
+    
+    // Copy and convert BGR to RGB (GDI+ uses BGR format)
+    for (UINT y = 0; y < height; ++y) {
+        for (UINT x = 0; x < width; ++x) {
+            int src_idx = (y * bitmapData.Stride) + (x * 3);
+            int dst_idx = (y * width + x) * 3;
+            textureData[dst_idx] = pixels[src_idx + 2];     // R
+            textureData[dst_idx + 1] = pixels[src_idx + 1]; // G
+            textureData[dst_idx + 2] = pixels[src_idx];     // B
+        }
+    }
+    
+    bitmap->UnlockBits(&bitmapData);
+    
+    // Upload to OpenGL
     glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData);
     glGenerateMipmap(GL_TEXTURE_2D);
-
+    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    delete[] data;
     
-    std::cout << "Street texture loaded (procedural)" << std::endl;
+    // Cleanup
+    delete[] textureData;
+    delete bitmap;
+    delete image;
+    
+    std::cout << "Successfully loaded texture: " << path << " (" << width << "x" << height << ")" << std::endl;
+    
     return textureID;
 }
