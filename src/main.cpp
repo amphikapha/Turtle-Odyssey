@@ -87,11 +87,22 @@ int main()
     const int NUM_LANES = 5;
     const float LANE_WIDTH = 3.0f;
     
-    // Create multiple cars - กระจายตามเลน (Z axis)
+    // Create multiple cars - กระจายตามเลน (Z axis) พร้อมการเว้นช่องห่าง
     for (int i = 0; i < 8; i++) {
         int lane = (i % NUM_LANES) - 2; // Lanes from -2 to 2 (Z axis)
         bool movingRight = (rand() % 2 == 0);
         Car* car = new Car(lane, LANE_WIDTH, movingRight);
+        
+        // สเปรดรถให้กระจายตัวตามแกน X เพื่อลดการซ้อนกัน (เพิ่มระยะห่างให้มากขึ้น)
+        if (movingRight) {
+            car->position.x = -30.0f + (i * 12.0f); // เว้นห่าง 12 หน่วยต่อคัน (เพิ่มจาก 8)
+        } else {
+            car->position.x = 30.0f - (i * 12.0f);
+        }
+        
+        // ปรับ Y ให้รถแต่ละคันอยู่ที่ความสูงเดียวกัน เพื่อไม่ให้ซ้อนตามแกน Y
+        car->position.y = 0.3f + (lane * 0.1f); // ปรับความสูงตามแนวเล็กน้อยตามแต่ละเลน
+        
         // ไม่ต้องปรับ Z อีก เพราะ constructor จัดการแล้ว
         cars.push_back(car);
     }

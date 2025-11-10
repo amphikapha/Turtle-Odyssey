@@ -36,7 +36,7 @@ public:
             rotation.y = -90.0f; // หมุนหันไปซ้าย
         }
 
-        scale = glm::vec3(1.5f, 1.5f, 1.5f); // ขนาดรถ
+        scale = glm::vec3(2.5f, 2.5f, 2.5f); // ขนาดรถ (ใหญ่ขึ้น)
         
         // Random car color
         float r = 0.3f + static_cast<float>(rand()) / RAND_MAX * 0.7f;
@@ -49,7 +49,7 @@ public:
         
         // Fallback to cube if model not found
         if (!useModel) {
-            scale = glm::vec3(3.0f, 0.8f, 1.5f); // Box car size (ยาวแนวนอน)
+            scale = glm::vec3(4.0f, 1.2f, 2.0f); // Box car size (ยาวแนวนอน - ใหญ่ขึ้น)
             CreateCarMesh();
         }
     }
@@ -75,12 +75,12 @@ public:
     void Update(float deltaTime) override {
         GameObject::Update(deltaTime);
 
-        // Reset car if it goes off screen
+        // Reset car if it goes off screen with more spacing
         // รถวิ่งแนวนอน (X axis)
-        if (velocity.x > 0 && position.x > 35.0f) {
-            position.x = -30.0f;
-        } else if (velocity.x < 0 && position.x < -35.0f) {
-            position.x = 30.0f;
+        if (velocity.x > 0 && position.x > 40.0f) {
+            position.x = -50.0f; // เริ่มไกลออกไปเพื่อหลีกเลี่ยงการชน
+        } else if (velocity.x < 0 && position.x < -40.0f) {
+            position.x = 50.0f;
         }
     }
 
