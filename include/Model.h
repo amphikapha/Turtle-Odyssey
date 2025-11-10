@@ -157,11 +157,21 @@ private:
         }
         // Load textures for car models
         else if (modelPath.find("Retro") != std::string::npos || modelPath.find("retro") != std::string::npos) {
+            // Multiple car textures to choose from
+            std::vector<std::string> carTextures = {
+                "Retro Car.jpeg",
+                "Retro Car Purple.jpg"
+            };
+            
+            // Randomly select one texture
+            int randomIndex = rand() % carTextures.size();
+            std::string selectedTexture = carTextures[randomIndex];
+            
             // Try different possible texture paths
             std::vector<std::string> possiblePaths = {
-                directory + "/../textures/Retro Car.jpeg",
-                directory + "/Retro Car.jpeg",
-                "assets/free-retro-american-car-cartoon-low-poly/textures/Retro Car.jpeg"
+                directory + "/../textures/" + selectedTexture,
+                directory + "/" + selectedTexture,
+                "assets/free-retro-american-car-cartoon-low-poly/textures/" + selectedTexture
             };
             
             for (const auto& texturePath : possiblePaths) {
