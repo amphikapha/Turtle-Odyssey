@@ -1,0 +1,45 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# Visual Studio files
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Executables
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Object files
+*.o
+*.obj
+
+# Libraries
+*.lib
+*.a
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# External libraries (if not using vcpkg)
+external/*/
+
+# Assets that are too large
+assets/
+
+# Logs
+*.log
