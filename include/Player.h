@@ -19,8 +19,8 @@ public:
 
     Player(glm::vec3 startPos) {
         position = startPos;
-        position.y = 1.2f; // Adjust height so feet are on ground (not sinking)
-        scale = glm::vec3(2.0f, 2.0f, 2.0f);
+        position.y = 3.5f; // Adjust height so feet are on ground (not sinking)
+        scale = glm::vec3(1.0f, 1.0f, 1.0f);
         rotation = glm::vec3(0.0f, 0.0f, 0.0f); // Face forward
         color = glm::vec3(1.0f, 1.0f, 1.0f);
         moveSpeed = 5.0f;
@@ -66,8 +66,8 @@ public:
             jumpVelocity += gravity * deltaTime;
             position.y += jumpVelocity * deltaTime;
 
-            if (position.y <= 1.2f) { // Ground level (adjusted)
-                position.y = 1.2f;
+            if (position.y <= 3.5f) { // Ground level (adjusted)
+                position.y = 3.5f;
                 isJumping = false;
                 jumpVelocity = 0.0f;
             }
