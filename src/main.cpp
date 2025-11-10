@@ -39,6 +39,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 void processInput(GLFWwindow* window, Player* player);
 unsigned int createGroundPlane();
 void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 projection);
+unsigned int loadTexture(const char* path);
 
 int main()
 {
@@ -109,6 +110,9 @@ int main()
 
     // Create ground
     unsigned int groundVAO = createGroundPlane();
+    
+    // Load street texture for ground
+    unsigned int streetTexture = loadTexture("assets/textures/street.jpg");
 
     // Lighting
     glm::vec3 lightPos(0.0f, 20.0f, 0.0f);
@@ -181,13 +185,17 @@ int main()
         shader.setVec3("lightColor", lightColor);
         shader.setVec3("viewPos", camera.Position);
 
-        // Bind default texture unit (will use white if no texture loaded)
+        // Bind street texture for ground
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, 0); // White texture as default
+        glBindTexture(GL_TEXTURE_2D, streetTexture);
         shader.setInt("ourTexture", 0);
 
         // Render ground
         renderGround(groundVAO, &shader, view, projection);
+
+        // Bind default texture unit for other objects (will use white if no texture loaded)
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, 0); // White texture as default
 
         // Render player
         shader.setMat4("model", player->GetModelMatrix());
@@ -216,6 +224,7 @@ int main()
         delete car;
     }
     glDeleteVertexArrays(1, &groundVAO);
+    glDeleteTextures(1, &streetTexture);
 
     glfwTerminate();
     return 0;
@@ -279,16 +288,16 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 unsigned int createGroundPlane()
 {
-    // Create a large ground plane
+    // Create a large ground plane with texture coordinates
     float groundVertices[] = {
-        // positions          
-        -50.0f, 0.0f, -50.0f,
-         50.0f, 0.0f, -50.0f,
-         50.0f, 0.0f,  50.0f,
+        // positions                texCoords        
+        -50.0f, 0.0f, -50.0f,      0.0f, 0.0f,
+         50.0f, 0.0f, -50.0f,      10.0f, 0.0f,
+         50.0f, 0.0f,  50.0f,      10.0f, 10.0f,
 
-         50.0f, 0.0f,  50.0f,
-        -50.0f, 0.0f,  50.0f,
-        -50.0f, 0.0f, -50.0f,
+         50.0f, 0.0f,  50.0f,      10.0f, 10.0f,
+        -50.0f, 0.0f,  50.0f,      0.0f, 10.0f,
+        -50.0f, 0.0f, -50.0f,      0.0f, 0.0f,
     };
 
     unsigned int VBO, VAO;
@@ -300,8 +309,13 @@ unsigned int createGroundPlane()
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(groundVertices), groundVertices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+
+    // Texture coordinate attribute
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -313,9 +327,51 @@ void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 pr
 {
     glm::mat4 model = glm::mat4(1.0f);
     shader->setMat4("model", model);
-    shader->setVec3("objectColor", glm::vec3(0.3f, 0.3f, 0.3f)); // Gray road
+    shader->setVec3("objectColor", glm::vec3(1.0f, 1.0f, 1.0f)); // White - let texture show
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+}
+
+unsigned int loadTexture(const char* path)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    // For now, create a simple procedural texture
+    // TODO: Replace with actual image loading
+    unsigned char* data = new unsigned char[256 * 256 * 3];
+    
+    // Fill with a checkerboard pattern to simulate street
+    for (int y = 0; y < 256; ++y) {
+        for (int x = 0; x < 256; ++x) {
+            int idx = (y * 256 + x) * 3;
+            // Create a road-like pattern with lines
+            if ((x % 32 < 2) || (y % 64 < 2)) {
+                data[idx] = 255;     // R
+                data[idx + 1] = 255; // G
+                data[idx + 2] = 255; // B (white lines)
+            } else {
+                // Gray asphalt
+                data[idx] = 80;      // R
+                data[idx + 1] = 80;  // G
+                data[idx + 2] = 80;  // B
+            }
+        }
+    }
+
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    delete[] data;
+    
+    std::cout << "Street texture loaded (procedural)" << std::endl;
+    return textureID;
 }
