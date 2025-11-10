@@ -19,9 +19,10 @@ public:
 
     Player(glm::vec3 startPos) {
         position = startPos;
-        scale = glm::vec3(2.0f, 2.0f, 2.0f); // ลองเพิ่มขนาดมากขึ้น
-        rotation = glm::vec3(0.0f, 0.0f, 0.0f); // ไม่หมุนก่อน ดูรูปแบบเดิม
-        color = glm::vec3(0.2f, 0.6f, 0.3f); // Green turtle
+        position.y = 1.2f; // Adjust height so feet are on ground (not sinking)
+        scale = glm::vec3(0.8f, 0.8f, 0.8f);
+        rotation = glm::vec3(-90.0f, 0.0f, 0.0f); // Face forward (remove Y=180 rotation)
+        color = glm::vec3(1.0f, 1.0f, 1.0f);
         moveSpeed = 5.0f;
         jumpHeight = 2.0f;
         isJumping = false;
@@ -33,7 +34,7 @@ public:
         useModel = false;
 
         // Try to load model
-        LoadModel("assets/turtle/source/turtle/scene.gltf");
+        LoadModel("assets/toonturtle/source/ToonTurtle.fbx");
         
         // Fallback to cube if model not found
         if (!useModel) {
@@ -65,8 +66,8 @@ public:
             jumpVelocity += gravity * deltaTime;
             position.y += jumpVelocity * deltaTime;
 
-            if (position.y <= 1.0f) { // Ground level
-                position.y = 1.0f;
+            if (position.y <= 1.2f) { // Ground level (adjusted)
+                position.y = 1.2f;
                 isJumping = false;
                 jumpVelocity = 0.0f;
             }

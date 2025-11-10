@@ -21,6 +21,7 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 target_include_directories(${PROJECT_NAME} PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/external/glad/include
+    C:/Users/mayma/Documents/year3/game/vcpkg/installed/x64-windows/include
 )
 
 # Find OpenGL

@@ -76,8 +76,8 @@ int main()
     // Build and compile shaders
     Shader shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl");
 
-    // Create game objects - เริ่มตรงกลาง (x=0) ด้านล่างของแผนที่
-    Player* player = new Player(glm::vec3(0.0f, 1.0f, 15.0f));
+    // Create game objects
+    Player* player = new Player(glm::vec3(0.0f, 0.5f, 15.0f));
     
     // Set camera to follow player from start
     camera.FollowTarget(player->position);
@@ -170,15 +170,20 @@ int main()
         shader.setVec3("lightColor", lightColor);
         shader.setVec3("viewPos", camera.Position);
 
+        // Bind default texture unit (will use white if no texture loaded)
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, 0); // White texture as default
+        shader.setInt("ourTexture", 0);
+
         // Render ground
         renderGround(groundVAO, &shader, view, projection);
 
         // Render player
         shader.setMat4("model", player->GetModelMatrix());
         if (player->hasSpeedBoost) {
-            shader.setVec3("objectColor", glm::vec3(0.2f, 1.0f, 0.3f)); // Bright green when boosted
+            shader.setVec3("objectColor", glm::vec3(0.5f, 1.0f, 0.5f)); // Bright green when boosted
         } else {
-            shader.setVec3("objectColor", player->color);
+            shader.setVec3("objectColor", glm::vec3(1.0f, 1.0f, 1.0f)); // White - ให้ texture แสดง
         }
         player->Draw();
 
