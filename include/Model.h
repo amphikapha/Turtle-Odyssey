@@ -28,12 +28,14 @@ public:
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
     std::vector<unsigned int> textures;
+    glm::vec3 diffuseColor;
     unsigned int VAO, VBO, EBO;
 
     Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std::vector<unsigned int> textures = {}) {
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
+        this->diffuseColor = glm::vec3(1.0f, 1.0f, 1.0f);
         setupMesh();
     }
 
@@ -43,7 +45,25 @@ public:
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, textures[i]);
         }
-        
+        // If shader has an "objectColor" uniform, set it to the mesh diffuse color when appropriate.
+        // However, if the shader requests an overrideColor, respect that and do not overwrite the uniform
+        GLint currentProg = 0;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &currentProg);
+        if (currentProg != 0) {
+            GLint loc = glGetUniformLocation(currentProg, "objectColor");
+            GLint overrideLoc = glGetUniformLocation(currentProg, "overrideColor");
+            bool overrideActive = false;
+            if (overrideLoc != -1) {
+                GLint ov = 0;
+                // Query the current value of overrideColor from the active program
+                glGetUniformiv((GLuint)currentProg, overrideLoc, &ov);
+                overrideActive = (ov != 0);
+            }
+            if (loc != -1 && !overrideActive) {
+                glUniform3f(loc, diffuseColor.r, diffuseColor.g, diffuseColor.b);
+            }
+        }
+
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
@@ -407,7 +427,17 @@ private:
             meshTextures.push_back(texID);
         }
         
-        return Mesh(vertices, indices, meshTextures);
+        Mesh m(vertices, indices, meshTextures);
+        // Attempt to read material diffuse color from Assimp material; use it as mesh diffuseColor
+        if (mesh->mMaterialIndex >= 0 && scene && scene->mMaterials) {
+            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+            aiColor4D color;
+            if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_DIFFUSE, color)) {
+                m.diffuseColor = glm::vec3(color.r, color.g, color.b);
+            }
+        }
+
+        return m;
     }
 
     unsigned int loadTexture(const char* path) {

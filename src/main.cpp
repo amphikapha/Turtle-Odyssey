@@ -16,6 +16,8 @@
 #include <fstream>
 #include <windows.h>
 #include <gdiplus.h>
+#include <cmath>
+#include <set>
 #pragma comment(lib, "gdiplus.lib")
 
 // Settings
@@ -101,28 +103,73 @@ int main()
     // Use 10 lanes (wider street with many lanes)
     const int NUM_LANES = 10;
     // Increase lane width so lanes don't overlap visually
-    const float LANE_WIDTH = 5.0f;
+    const float LANE_WIDTH = 6.0f;
     // Each texture zone size (must match ground rendering later)
-    const float TEXTURE_ZONE_SIZE = 60.0f; // Each zone is 60 units
+    // Reduced to 3/4 of original so zones change sooner (was 60 -> now 45)
+    const float TEXTURE_ZONE_SIZE = 40.0f; // Each zone is 45 units
 
     // Helper: get the Z center of the next street zone (we will treat zone index mod 3 == 2 as street)
     const int STREET_ZONE_MOD = 2; // 0=grass,1=lake,2=street (we want start on grass)
-    auto getNearestStreetZoneCenter = [&](float referenceZ, int minAheadZones = 1) {
-        auto mod3 = [](int v) {
-            int m = v % 3;
-            if (m < 0) m += 3;
-            return m;
-        };
 
-        int baseZone = static_cast<int>(-referenceZ / TEXTURE_ZONE_SIZE);
+    auto mod3 = [](int v) {
+        int m = v % 3;
+        if (m < 0) m += 3;
+        return m;
+    };
+
+    // Return the integer zone index (floor-based) of the next street zone at least minAheadZones ahead
+    auto getNearestStreetZoneIndex = [&](float referenceZ, int minAheadZones = 1) {
+        int baseZone = static_cast<int>(std::floor(-referenceZ / TEXTURE_ZONE_SIZE));
         int targetZone = baseZone + minAheadZones; // choose a zone that is at least this far ahead
-        // advance until we hit a street zone (zone index mod 3 == STREET_ZONE_MOD)
         while (mod3(targetZone) != STREET_ZONE_MOD) ++targetZone;
+        return targetZone;
+    };
 
-        // compute the world Z coordinate at the center of that zone
-        float zoneCenterZ = - (targetZone * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+    auto getNearestStreetZoneCenter = [&](float referenceZ, int minAheadZones = 1) {
+        int zone = getNearestStreetZoneIndex(referenceZ, minAheadZones);
+        float zoneCenterZ = - (zone * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
         return zoneCenterZ;
     };
+
+    // Hearts (life pickups)
+    int playerHearts = 1; // player starts with one heart
+
+    // Load heart model (try OBJ then FBX)
+    Model* heartModel = new Model();
+    bool heartModelLoaded = heartModel->loadModel("assets/22_ Heart/Heart.obj");
+    if (!heartModelLoaded) {
+        heartModelLoaded = heartModel->loadModel("assets/22_ Heart/Heart.fbx");
+        if (!heartModelLoaded) {
+            delete heartModel;
+            heartModel = nullptr;
+            std::cout << "Warning: Could not load heart model; will fallback to simple marker." << std::endl;
+        }
+    }
+
+    // One heart per grass zone: track which grass zones already had a heart spawned or consumed
+    std::set<int> heartZonesUsed;
+    std::vector<GameObject*> hearts; // GameObject per heart for collision and transform
+
+    auto spawnHeartInZone = [&](int zoneIndex) {
+        if (heartZonesUsed.count(zoneIndex)) return; // already used
+        heartZonesUsed.insert(zoneIndex);
+
+        float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+        GameObject* h = new GameObject();
+        h->position = glm::vec3(0.0f, 4.0f, z); // slightly above ground
+        h->scale = glm::vec3(1.0f, 1.0f, 1.0f);
+        // If no model, shrink marker
+        if (!heartModel) h->scale = glm::vec3(0.5f);
+        hearts.push_back(h);
+    };
+
+    // Spawn initial hearts for upcoming grass zones (a few ahead)
+    int startZone = static_cast<int>(std::floor(-player->position.z / TEXTURE_ZONE_SIZE));
+    for (int z = startZone; z <= startZone + 8; ++z) {
+        if (mod3(z) == 0) { // grass zone
+            spawnHeartInZone(z);
+        }
+    }
     
     // Create multiple cars - กระจายตามเลน (Z axis) พร้อมการเว้นช่องห่าง
     for (int i = 0; i < 8; i++) {
@@ -144,9 +191,11 @@ int main()
         
         // Force the car to spawn in a street zone only (no cars on grass/lake)
         // spread cars across several street zones ahead of the player to avoid overlap
-    int extraAheadZones = 1 + (i / NUM_LANES); // small distribution across zones
-    // Place car in the street zone center plus lane offset so cars spread across lanes
-    car->position.z = getNearestStreetZoneCenter(player->position.z, extraAheadZones) + lane * LANE_WIDTH;
+    // Distribute initial cars across the first few street zones so early streets aren't overcrowded
+    int extraAheadZones = 1 + (i / 3); // spread every 3 cars into the next zone
+    // Determine zone index and place car in that street zone's lane position
+    int initZone = getNearestStreetZoneIndex(player->position.z, extraAheadZones);
+    car->position.z = - (initZone * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f) + lane * LANE_WIDTH;
 
         cars.push_back(car);
     }
@@ -195,9 +244,18 @@ int main()
             player->Update(deltaTime);
 
             // Update ground texture zone based on player position
-            // Calculate which zone the player is in (0=street, 1=grass, 2=lake, cycles)
-            int zoneIndex = static_cast<int>(-player->position.z / TEXTURE_ZONE_SIZE);
-            currentTextureZone = zoneIndex % 3; // Cycle through 0, 1, 2
+            // Calculate which zone the player is in (0=grass, 1=lake, 2=street, cycles)
+            int zoneIndex = static_cast<int>(std::floor(-player->position.z / TEXTURE_ZONE_SIZE));
+            currentTextureZone = zoneIndex % 3; if (currentTextureZone < 0) currentTextureZone += 3; // Cycle through 0,1,2
+
+            // Spawn hearts ahead on newly discovered grass zones (ensure one per grass zone)
+            int playerBaseZone = static_cast<int>(std::floor(-player->position.z / TEXTURE_ZONE_SIZE));
+            for (int z = playerBaseZone; z <= playerBaseZone + 12; ++z) {
+                if (mod3(z) == 0 && heartZonesUsed.count(z) == 0) {
+                    // small chance to spawn (so not every grass has one) - set to always spawn for now
+                    spawnHeartInZone(z);
+                }
+            }
 
             // Spawn new cars as player moves forward
             if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
@@ -217,14 +275,44 @@ int main()
                         newCar->position.x = 50.0f - (i * 15.0f);
                     }
                     // Place spawn in a street zone ahead of the player to ensure cars only appear on streets
-                    int extraZones = 2 + (rand() % 3); // 2..4 zones ahead for variety
-                    // Place new car in the chosen street zone but offset by lane so each lane gets cars
-                    newCar->position.z = getNearestStreetZoneCenter(player->position.z, extraZones) + lane * LANE_WIDTH;
-                    newCar->position.y = 0.3f + (lane * 0.1f);
-                    
-                    cars.push_back(newCar);
+                        int extraZones = 2 + (rand() % 3); // 2..4 zones ahead for variety
+
+                        // Determine the target street zone index and cap cars per zone to avoid overcrowding
+                        int targetZone = getNearestStreetZoneIndex(player->position.z, extraZones);
+                        // Count existing cars in that zone
+                        int existingInZone = 0;
+                        for (auto c : cars) {
+                            int cz = static_cast<int>(std::floor(-c->position.z / TEXTURE_ZONE_SIZE));
+                            if (cz == targetZone) existingInZone++;
+                        }
+
+                        const int MAX_CARS_PER_ZONE = NUM_LANES * 2; // allow up to 2 cars per lane
+                        if (existingInZone >= MAX_CARS_PER_ZONE) {
+                            delete newCar; // skip spawn if zone full
+                            continue;
+                        }
+
+                        // Place new car in the chosen street zone but offset by lane so each lane gets cars
+                        newCar->position.z = - (targetZone * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f) + lane * LANE_WIDTH;
+                        newCar->position.y = 0.3f + (lane * 0.1f);
+
+                        cars.push_back(newCar);
                 }
                 std::cout << "New cars spawned! Total cars: " << cars.size() << std::endl;
+            }
+
+            // Update hearts: check collection first
+            for (int h = (int)hearts.size() - 1; h >= 0; --h) {
+                GameObject* hg = hearts[h];
+                // Simple bobbing animation for visibility
+                hg->position.y = 4.0f + sinf(static_cast<float>(glfwGetTime()) * 2.0f) * 0.2f;
+                // Check collision with player
+                if (player->CheckCollision(hg, 0.0f)) {
+                    playerHearts++;
+                    std::cout << "Picked up a heart! Hearts=" << playerHearts << std::endl;
+                    delete hg;
+                    hearts.erase(hearts.begin() + h);
+                }
             }
 
             // Update cars and remove ones that are too far behind
@@ -235,15 +323,24 @@ int main()
                 // Check collision with player
                 // Use a small positive margin so the player dies when lightly touching the car
                 if (player->CheckCollision(cars[i], 1.f)) {
-                    gameOver = true;
-                    std::cout << "\n=== GAME OVER ===" << std::endl;
-                    std::cout << "You got hit by a car!" << std::endl;
-                    std::cout << "Final Score: " << score << std::endl;
-                    std::cout << "Press ESC to exit" << std::endl;
+                    if (playerHearts > 0) {
+                        playerHearts--;
+                        std::cout << "Hit by car! Hearts left=" << playerHearts << std::endl;
+                        // remove car to avoid repeated hits
+                        delete cars[i];
+                        cars.erase(cars.begin() + i);
+                        continue;
+                    } else {
+                        gameOver = true;
+                        std::cout << "\n=== GAME OVER ===" << std::endl;
+                        std::cout << "You got hit by a car!" << std::endl;
+                        std::cout << "Final Score: " << score << std::endl;
+                        std::cout << "Press ESC to exit" << std::endl;
+                    }
                 }
                 
                 // Safety: if a car somehow ends up on a non-street zone, remove it
-                int carZoneIdx = static_cast<int>(-cars[i]->position.z / TEXTURE_ZONE_SIZE);
+                int carZoneIdx = static_cast<int>(std::floor(-cars[i]->position.z / TEXTURE_ZONE_SIZE));
                 int carZoneMod = carZoneIdx % 3; if (carZoneMod < 0) carZoneMod += 3;
                 // street zones now use mod == STREET_ZONE_MOD
                 if (carZoneMod != STREET_ZONE_MOD) {
@@ -352,6 +449,22 @@ int main()
             car->Draw();
         }
 
+        // Render hearts (life pickups)
+        for (auto h : hearts) {
+            shader.setMat4("model", h->GetModelMatrix());
+            if (heartModel) {
+                // Force a solid red color for the heart model (override any model textures)
+                shader.setVec3("objectColor", glm::vec3(1.0f, 0.0f, 0.0f));
+                shader.setBool("overrideColor", true);
+                heartModel->Draw();
+                shader.setBool("overrideColor", false);
+            } else {
+                // Fallback: draw a simple red marker using GameObject's mesh
+                shader.setVec3("objectColor", glm::vec3(1.0f, 0.0f, 0.0f));
+                h->Draw();
+            }
+        }
+
         // Swap buffers and poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -434,7 +547,7 @@ unsigned int createGroundPlane()
     // Create a ground section (20 units long for terrain transitions)
     // Each section will be rendered multiple times at different Z positions
     float width = 500.0f;   // Wide enough for all lanes
-    float depth = 60.0f;    // Length of one section (matches SECTION_SIZE / TEXTURE_ZONE_SIZE)
+    float depth = 40.0f;    // Length of one section (matches SECTION_SIZE / TEXTURE_ZONE_SIZE) - reduced to 3/4
     
     // Texture coordinate scale - higher values = more tiling = smaller/more detailed textures
     // Scale based on the actual dimensions to avoid stretching

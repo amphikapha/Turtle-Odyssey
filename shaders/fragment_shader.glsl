@@ -15,6 +15,7 @@ uniform sampler2D groundTex[3];
 uniform float textureZoneSize; // world-space size of each texture zone (Z axis)
 uniform bool useGroundTextures; // when true, blend ground textures based on FragPos.z
 uniform sampler2D ourTexture; // default object texture (unit 0)
+uniform bool overrideColor; // when true, use objectColor for non-ground objects unconditionally
 
 void main()
 {
@@ -56,16 +57,21 @@ void main()
         vec3 col0 = c0.rgb;
         vec3 col1 = c1.rgb;
 
-        vec3 blended = mix(col0, col1, frac);
-
-        finalColor = blended;
+    // Use hard-cutoff between zones (no blending). Always use the texture of the current zone
+    // This gives a crisp border at zone boundaries instead of a smooth blend.
+    finalColor = col0;
     } else {
-        // Sample object texture when not rendering blended ground
-        vec4 texColor = texture(ourTexture, TexCoords);
-        if (texColor.a > 0.0)
-            finalColor = texColor.rgb;
-        else
+        // If requested, force a solid object color (useful for pickups)
+        if (overrideColor) {
             finalColor = objectColor;
+        } else {
+            // Sample object texture when not rendering blended ground
+            vec4 texColor = texture(ourTexture, TexCoords);
+            if (texColor.a > 0.0)
+                finalColor = texColor.rgb;
+            else
+                finalColor = objectColor;
+        }
     }
 
     // Apply lighting to the chosen color
