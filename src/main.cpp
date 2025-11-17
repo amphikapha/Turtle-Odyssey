@@ -128,10 +128,11 @@ int main()
     unsigned int grassTexture = loadTexture("assets/textures/grass.jpg");
     unsigned int lakeTexture = loadTexture("assets/textures/lake.png");
     unsigned int streetTexture = loadTexture("assets/textures/street.jpg");
-    
+
     // Store textures in array for easy access
     unsigned int groundTextures[3] = { streetTexture, grassTexture, lakeTexture };
-    const float TEXTURE_ZONE_SIZE = 20.0f; // Each zone is 20 units
+    // Make each texture zone a bit longer so transitions are less frequent
+    const float TEXTURE_ZONE_SIZE = 60.0f; // Each zone is 60 units (was 20)
     int currentTextureZone = 0;
 
     // Lighting
@@ -238,6 +239,9 @@ int main()
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
 
+    // Ensure default object texture uniform points to texture unit 0
+    shader.setInt("ourTexture", 0);
+
         // Lighting uniforms
         shader.setVec3("lightPos", lightPos);
         shader.setVec3("lightColor", lightColor);
@@ -245,30 +249,38 @@ int main()
 
         // Render multiple ground sections with different textures
         // This creates a continuous visible transition between terrain types
-        const float SECTION_SIZE = 20.0f; // Size of each ground section (matches TEXTURE_ZONE_SIZE)
+    const float SECTION_SIZE = TEXTURE_ZONE_SIZE; // Size of each ground section (match zone size)
         
+        // Bind all three ground textures to texture units 0..2 and inform shader
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, groundTextures[0]);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, groundTextures[1]);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, groundTextures[2]);
+    shader.setInt("groundTex[0]", 0);
+    shader.setInt("groundTex[1]", 1);
+    shader.setInt("groundTex[2]", 2);
+        shader.setFloat("textureZoneSize", TEXTURE_ZONE_SIZE);
+        shader.setBool("useGroundTextures", true);
+
         // Render 9 sections: 4 behind, 1 current, 4 ahead
         // This ensures the player never sees sky cutting off the ground
         for (int i = -4; i <= 4; ++i) {
-            int zoneIndex = currentTextureZone + i;
-            int textureIndex = ((zoneIndex % 3) + 3) % 3; // Handle negative modulo
-            
-            // Bind texture for this section
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, groundTextures[textureIndex]);
-            shader.setInt("ourTexture", 0);
-            
-            // Position this ground section
+            // Position this ground section in world space
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(0.0f, 0.0f, -i * SECTION_SIZE));
             shader.setMat4("model", model);
             shader.setVec3("objectColor", glm::vec3(1.0f, 1.0f, 1.0f)); // White - let texture show
-            
-            // Render this section
+
+            // Render this section (fragment shader will pick and blend textures based on FragPos.z)
             glBindVertexArray(groundVAO);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             glBindVertexArray(0);
         }
+
+        // Turn off ground-specific texturing for other objects
+        shader.setBool("useGroundTextures", false);
 
         // Bind default texture unit for other objects (will use white if no texture loaded)
         glActiveTexture(GL_TEXTURE0);
@@ -372,7 +384,7 @@ unsigned int createGroundPlane()
     // Create a ground section (20 units long for terrain transitions)
     // Each section will be rendered multiple times at different Z positions
     float width = 500.0f;   // Wide enough for all lanes
-    float depth = 20.0f;    // Length of one section (matches SECTION_SIZE)
+    float depth = 60.0f;    // Length of one section (matches SECTION_SIZE / TEXTURE_ZONE_SIZE)
     
     // Texture coordinate scale - higher values = more tiling = smaller/more detailed textures
     // Scale based on the actual dimensions to avoid stretching
@@ -462,8 +474,11 @@ unsigned int loadTexture(const char* path)
             }
         }
         
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 128, 128, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    // Ensure proper alignment for tightly-packed data
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 128, 128, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         glGenerateMipmap(GL_TEXTURE_2D);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -476,49 +491,52 @@ unsigned int loadTexture(const char* path)
     UINT width = image->GetWidth();
     UINT height = image->GetHeight();
     
-    // Create bitmap from image
-    Bitmap* bitmap = new Bitmap(width, height, PixelFormat24bppRGB);
+    // Create an RGBA bitmap to preserve alpha if present
+    Bitmap* bitmap = new Bitmap(width, height, PixelFormat32bppARGB);
     Graphics* graphics = Graphics::FromImage(bitmap);
     graphics->DrawImage(image, 0, 0);
     delete graphics;
-    
-    // Lock bitmap bits for reading
+
+    // Lock bitmap bits for reading (32bpp ARGB)
     BitmapData bitmapData;
     Rect rect(0, 0, width, height);
-    bitmap->LockBits(&rect, ImageLockModeRead, PixelFormat24bppRGB, &bitmapData);
-    
+    bitmap->LockBits(&rect, ImageLockModeRead, PixelFormat32bppARGB, &bitmapData);
+
     unsigned char* pixels = static_cast<unsigned char*>(bitmapData.Scan0);
-    unsigned char* textureData = new unsigned char[width * height * 3];
-    
-    // Copy and convert BGR to RGB (GDI+ uses BGR format)
+    unsigned char* textureData = new unsigned char[width * height * 4];
+
+    // Copy and convert BGRA -> RGBA (GDI+ uses BGRA ordering for 32bpp)
     for (UINT y = 0; y < height; ++y) {
         for (UINT x = 0; x < width; ++x) {
-            int src_idx = (y * bitmapData.Stride) + (x * 3);
-            int dst_idx = (y * width + x) * 3;
-            textureData[dst_idx] = pixels[src_idx + 2];     // R
+            int src_idx = (y * bitmapData.Stride) + (x * 4);
+            int dst_idx = (y * width + x) * 4;
+            // BGRA -> RGBA
+            textureData[dst_idx + 0] = pixels[src_idx + 2]; // R
             textureData[dst_idx + 1] = pixels[src_idx + 1]; // G
-            textureData[dst_idx + 2] = pixels[src_idx];     // B
+            textureData[dst_idx + 2] = pixels[src_idx + 0]; // B
+            textureData[dst_idx + 3] = pixels[src_idx + 3]; // A
         }
     }
-    
+
     bitmap->UnlockBits(&bitmapData);
-    
-    // Upload to OpenGL
+
+    // Upload to OpenGL (use RGBA)
     glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, textureData);
     glGenerateMipmap(GL_TEXTURE_2D);
-    
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
+
     // Cleanup
     delete[] textureData;
     delete bitmap;
     delete image;
-    
+
     std::cout << "Successfully loaded texture: " << path << " (" << width << "x" << height << ")" << std::endl;
-    
+
     return textureID;
 }

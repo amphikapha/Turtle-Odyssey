@@ -9,7 +9,12 @@ uniform vec3 objectColor;
 uniform vec3 lightPos;
 uniform vec3 lightColor;
 uniform vec3 viewPos;
-uniform sampler2D ourTexture;
+
+// Ground blending: three textures (0..2)
+uniform sampler2D groundTex[3];
+uniform float textureZoneSize; // world-space size of each texture zone (Z axis)
+uniform bool useGroundTextures; // when true, blend ground textures based on FragPos.z
+uniform sampler2D ourTexture; // default object texture (unit 0)
 
 void main()
 {
@@ -30,16 +35,40 @@ void main()
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
     vec3 specular = specularStrength * spec * lightColor;  
     
-    // Get texture color
-    vec4 texColor = texture(ourTexture, TexCoords);
-    
-    // If texture is loaded (alpha > 0), use it; otherwise use objectColor
-    vec3 finalColor;
-    if (texColor.a > 0.0) {
-        finalColor = (ambient + diffuse + specular) * texColor.rgb;
+    vec3 finalColor = objectColor;
+
+    if (useGroundTextures) {
+        // Determine which zone this fragment lies in along Z (world space)
+        // We use -FragPos.z because the game uses decreasing Z to move forward
+        float zoneFloat = -FragPos.z / textureZoneSize;
+        float zoneFloor = floor(zoneFloat);
+        float frac = zoneFloat - zoneFloor; // blend factor between zoneFloor and zoneFloor+1
+
+        int idx = int(mod(zoneFloor, 3.0));
+        if (idx < 0) idx += 3;
+        int nextIdx = (idx + 1) % 3;
+
+    // Sample the two textures using the provided TexCoords (dynamic indexing)
+    vec4 c0 = texture(groundTex[idx], TexCoords);
+    vec4 c1 = texture(groundTex[nextIdx], TexCoords);
+
+        // If textures have alpha, respect it; otherwise assume alpha=1
+        vec3 col0 = c0.rgb;
+        vec3 col1 = c1.rgb;
+
+        vec3 blended = mix(col0, col1, frac);
+
+        finalColor = blended;
     } else {
-        finalColor = (ambient + diffuse + specular) * objectColor;
+        // Sample object texture when not rendering blended ground
+        vec4 texColor = texture(ourTexture, TexCoords);
+        if (texColor.a > 0.0)
+            finalColor = texColor.rgb;
+        else
+            finalColor = objectColor;
     }
-    
-    FragColor = vec4(finalColor, 1.0);
+
+    // Apply lighting to the chosen color
+    vec3 lit = (ambient + diffuse + specular) * finalColor;
+    FragColor = vec4(lit, 1.0);
 }
