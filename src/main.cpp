@@ -98,26 +98,56 @@ int main()
     
     // Create cars in different lanes
     std::vector<Car*> cars;
-    const int NUM_LANES = 5;
-    const float LANE_WIDTH = 3.0f;
+    // Use 10 lanes (wider street with many lanes)
+    const int NUM_LANES = 10;
+    // Increase lane width so lanes don't overlap visually
+    const float LANE_WIDTH = 5.0f;
+    // Each texture zone size (must match ground rendering later)
+    const float TEXTURE_ZONE_SIZE = 60.0f; // Each zone is 60 units
+
+    // Helper: get the Z center of the next street zone (we will treat zone index mod 3 == 2 as street)
+    const int STREET_ZONE_MOD = 2; // 0=grass,1=lake,2=street (we want start on grass)
+    auto getNearestStreetZoneCenter = [&](float referenceZ, int minAheadZones = 1) {
+        auto mod3 = [](int v) {
+            int m = v % 3;
+            if (m < 0) m += 3;
+            return m;
+        };
+
+        int baseZone = static_cast<int>(-referenceZ / TEXTURE_ZONE_SIZE);
+        int targetZone = baseZone + minAheadZones; // choose a zone that is at least this far ahead
+        // advance until we hit a street zone (zone index mod 3 == STREET_ZONE_MOD)
+        while (mod3(targetZone) != STREET_ZONE_MOD) ++targetZone;
+
+        // compute the world Z coordinate at the center of that zone
+        float zoneCenterZ = - (targetZone * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+        return zoneCenterZ;
+    };
     
     // Create multiple cars - กระจายตามเลน (Z axis) พร้อมการเว้นช่องห่าง
     for (int i = 0; i < 8; i++) {
-        int lane = (i % NUM_LANES) - 2; // Lanes from -2 to 2 (Z axis)
+        // Map i to lane indices in range roughly centered around 0. For NUM_LANES=10 this yields -5..4
+        int lane = (i % NUM_LANES) - (NUM_LANES / 2);
         bool movingRight = (rand() % 2 == 0);
         Car* car = new Car(lane, LANE_WIDTH, movingRight);
         
         // สเปรดรถให้กระจายตัวตามแกน X เพื่อลดการซ้อนกัน (เพิ่มระยะห่างให้มากขึ้น)
+        // Increase X spacing so cars don't pile up in a single lateral line
         if (movingRight) {
-            car->position.x = -30.0f + (i * 12.0f); // เว้นห่าง 12 หน่วยต่อคัน (เพิ่มจาก 8)
+            car->position.x = -50.0f + (i * 18.0f); // wider spacing
         } else {
-            car->position.x = 30.0f - (i * 12.0f);
+            car->position.x = 50.0f - (i * 18.0f);
         }
         
         // ปรับ Y ให้รถแต่ละคันอยู่ที่ความสูงเดียวกัน เพื่อไม่ให้ซ้อนตามแกน Y
         car->position.y = 0.3f + (lane * 0.1f); // ปรับความสูงตามแนวเล็กน้อยตามแต่ละเลน
         
-        // ไม่ต้องปรับ Z อีก เพราะ constructor จัดการแล้ว
+        // Force the car to spawn in a street zone only (no cars on grass/lake)
+        // spread cars across several street zones ahead of the player to avoid overlap
+    int extraAheadZones = 1 + (i / NUM_LANES); // small distribution across zones
+    // Place car in the street zone center plus lane offset so cars spread across lanes
+    car->position.z = getNearestStreetZoneCenter(player->position.z, extraAheadZones) + lane * LANE_WIDTH;
+
         cars.push_back(car);
     }
 
@@ -130,9 +160,10 @@ int main()
     unsigned int streetTexture = loadTexture("assets/textures/street.jpg");
 
     // Store textures in array for easy access
-    unsigned int groundTextures[3] = { streetTexture, grassTexture, lakeTexture };
-    // Make each texture zone a bit longer so transitions are less frequent
-    const float TEXTURE_ZONE_SIZE = 60.0f; // Each zone is 60 units (was 20)
+    // We want the world to start with grass, then lake, then street repeating.
+    // So index 0 = grass, 1 = lake, 2 = street
+    unsigned int groundTextures[3] = { grassTexture, lakeTexture, streetTexture };
+    // current texture zone index (0=grass,1=lake,2=street)
     int currentTextureZone = 0;
 
     // Lighting
@@ -175,17 +206,20 @@ int main()
                 // Spawn 2-3 new cars at different lanes (reduced from 3-5)
                 int numNewCars = 2 + (rand() % 2); // 2-3 cars
                 for (int i = 0; i < numNewCars; ++i) {
-                    int lane = (i % NUM_LANES) - 2; // Lanes from -2 to 2
+                    int lane = (i % NUM_LANES) - (NUM_LANES / 2); // support even-numbered lanes
                     bool movingRight = (rand() % 2 == 0);
                     Car* newCar = new Car(lane, LANE_WIDTH, movingRight);
                     
                     // Spawn further ahead to avoid pop-in
                     if (movingRight) {
-                        newCar->position.x = -35.0f + (i * 10.0f);
+                        newCar->position.x = -50.0f + (i * 15.0f);
                     } else {
-                        newCar->position.x = 35.0f - (i * 10.0f);
+                        newCar->position.x = 50.0f - (i * 15.0f);
                     }
-                    newCar->position.z = player->position.z - 50.0f; // Spawn further ahead
+                    // Place spawn in a street zone ahead of the player to ensure cars only appear on streets
+                    int extraZones = 2 + (rand() % 3); // 2..4 zones ahead for variety
+                    // Place new car in the chosen street zone but offset by lane so each lane gets cars
+                    newCar->position.z = getNearestStreetZoneCenter(player->position.z, extraZones) + lane * LANE_WIDTH;
                     newCar->position.y = 0.3f + (lane * 0.1f);
                     
                     cars.push_back(newCar);
@@ -208,6 +242,16 @@ int main()
                     std::cout << "Press ESC to exit" << std::endl;
                 }
                 
+                // Safety: if a car somehow ends up on a non-street zone, remove it
+                int carZoneIdx = static_cast<int>(-cars[i]->position.z / TEXTURE_ZONE_SIZE);
+                int carZoneMod = carZoneIdx % 3; if (carZoneMod < 0) carZoneMod += 3;
+                // street zones now use mod == STREET_ZONE_MOD
+                if (carZoneMod != STREET_ZONE_MOD) {
+                    delete cars[i];
+                    cars.erase(cars.begin() + i);
+                    continue;
+                }
+
                 // Remove cars that are too far behind (cleanup)
                 if (cars[i]->position.z > player->position.z + CAR_DESPAWN_DISTANCE) {
                     delete cars[i];
