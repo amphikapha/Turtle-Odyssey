@@ -309,12 +309,17 @@ int main()
         shader.setFloat("textureZoneSize", TEXTURE_ZONE_SIZE);
         shader.setBool("useGroundTextures", true);
 
-        // Render 9 sections: 4 behind, 1 current, 4 ahead
-        // This ensures the player never sees sky cutting off the ground
+        // Render multiple sections centered around the player's current zone so the ground follows the player
+        // Calculate the base zone index the player is currently in (zones use negative Z forward)
+        int baseZone = static_cast<int>(-player->position.z / SECTION_SIZE);
+        // Render 9 sections: 4 behind, current, 4 ahead relative to player's zone
         for (int i = -4; i <= 4; ++i) {
-            // Position this ground section in world space
+            int sectionZone = baseZone + i;
+            // compute the world Z coordinate at the center of that section
+            float sectionCenterZ = - (sectionZone * SECTION_SIZE + SECTION_SIZE * 0.5f);
+
             glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(0.0f, 0.0f, -i * SECTION_SIZE));
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, sectionCenterZ));
             shader.setMat4("model", model);
             shader.setVec3("objectColor", glm::vec3(1.0f, 1.0f, 1.0f)); // White - let texture show
 
