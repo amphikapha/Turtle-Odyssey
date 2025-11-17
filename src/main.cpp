@@ -199,7 +199,8 @@ int main()
                 cars[i]->Update(deltaTime);
 
                 // Check collision with player
-                if (player->CheckCollision(cars[i])) {
+                // Use a small positive margin so the player dies when lightly touching the car
+                if (player->CheckCollision(cars[i], 1.f)) {
                     gameOver = true;
                     std::cout << "\n=== GAME OVER ===" << std::endl;
                     std::cout << "You got hit by a car!" << std::endl;

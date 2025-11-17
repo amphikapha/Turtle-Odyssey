@@ -55,12 +55,19 @@ public:
         }
     }
 
-    // Simple AABB collision detection
+    // Simple AABB collision detection (touching the car counts as collision)
     bool CheckCollision(GameObject* other) {
+        return CheckCollision(other, 0.0f);
+    }
+
+    // Overload with margin: positive margin expands other's bounds (makes collision happen earlier),
+    // negative margin shrinks it. This lets Player request a more sensitive hit test without
+    // changing global behaviour.
+    bool CheckCollision(GameObject* other, float margin) {
         float thisHalfX = scale.x / 2.0f;
         float thisHalfZ = scale.z / 2.0f;
-        float otherHalfX = other->scale.x / 2.0f;
-        float otherHalfZ = other->scale.z / 2.0f;
+        float otherHalfX = other->scale.x / 2.0f + margin;
+        float otherHalfZ = other->scale.z / 2.0f + margin;
 
         bool collisionX = position.x + thisHalfX >= other->position.x - otherHalfX &&
                          other->position.x + otherHalfX >= position.x - thisHalfX;
