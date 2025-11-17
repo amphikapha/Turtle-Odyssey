@@ -134,6 +134,35 @@ int main()
     // Hearts (life pickups)
     int playerHearts = 1; // player starts with one heart
 
+    // Floating rafts for lake zones (use raft model asset instead of log)
+    std::vector<GameObject*> logs;
+    // Try loading raft model from provided assets (prefer glTF)
+    Model* raftModel = new Model();
+    std::cout << "Attempting to load raft model: assets/raft/raft.gltf" << std::endl;
+    std::cout << std::flush;
+    bool raftModelLoaded = raftModel->loadModel("assets/raft/raft.gltf");
+    std::cout << " -> loadModel returned: " << (raftModelLoaded ? "true" : "false") << std::endl;
+    if (raftModelLoaded) {
+        std::cout << "Raft model loaded: assets/raft/raft.gltf" << std::endl;
+        std::cout << " Raft meshes count: " << raftModel->meshes.size() << std::endl;
+    } else {
+        // Attempt Blender file as a fallback (if your model loader supports it)
+        std::cout << "Attempting fallback load: assets/raft/raft.blend" << std::endl;
+        std::cout << std::flush;
+        bool fallbackLoaded = raftModel->loadModel("assets/raft/raft.blend");
+        std::cout << " -> fallback load returned: " << (fallbackLoaded ? "true" : "false") << std::endl;
+        if (fallbackLoaded) {
+            std::cout << "Raft model loaded from fallback: assets/raft/raft.blend" << std::endl;
+            std::cout << " Raft meshes count: " << raftModel->meshes.size() << std::endl;
+            raftModelLoaded = true;
+        } else {
+            std::cout << "Warning: Could not load raft model; will use simple marker for rafts." << std::endl;
+            delete raftModel;
+            raftModel = nullptr;
+            raftModelLoaded = false;
+        }
+    }
+
     // Load heart model (try OBJ then FBX)
     Model* heartModel = new Model();
     bool heartModelLoaded = heartModel->loadModel("assets/22_ Heart/Heart.obj");
@@ -169,6 +198,47 @@ int main()
         if (mod3(z) == 0) { // grass zone
             spawnHeartInZone(z);
         }
+        // Spawn rafts in nearby lake zones using 3 lanes across the river
+        if (mod3(z) == 1) { // lake zone
+            const int RAFT_LANE_COUNT = 3;
+            const float RAFT_LANE_SPACING = 120.0f; // distance between lanes across X
+            float zpos = - (z * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+
+            // Spawn multiple rafts per lane with small random jitter so they don't line up perfectly
+            const int RAFTS_PER_LANE = 3; // number of rafts in each lane
+            for (int laneIdx = 0; laneIdx < RAFT_LANE_COUNT; ++laneIdx) {
+                // Center lanes around X=0
+                float centerX = (laneIdx - (RAFT_LANE_COUNT - 1) / 2.0f) * RAFT_LANE_SPACING;
+                for (int r = 0; r < RAFTS_PER_LANE; ++r) {
+                    GameObject* lg = new GameObject();
+                    float laneJitterX = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 20.0f; // +/-10
+                    float laneJitterZ = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 8.0f;  // +/-4
+                    // Spread rafts slightly along Z inside the zone so multiple per lane don't overlap
+                    float spreadZ = (r - (RAFTS_PER_LANE - 1) / 2.0f) * 10.0f; // spacing along Z
+                    // Place rafts so they sit on the water surface (consistent height)
+                    float raftHeightY = 0.5f;
+                    lg->position = glm::vec3(centerX + laneJitterX, raftHeightY, zpos + spreadZ + laneJitterZ);
+                    // Rafts are larger than simple logs; increase scale to better match raft model
+                    lg->scale = glm::vec3(8.0f, 1.5f, 3.0f); // approximate raft size
+                    // Rotate raft so it's lying flat: pitch forward (-90 degrees around X) with no yaw
+                    // Fixed rotation makes all rafts aligned and flat on the water surface
+                    lg->rotation = glm::vec3(-90.0f, 0.0f, 0.0f);
+                    // Random horizontal velocity left or right (keep modest speeds so they stay visible)
+                    float vx = (rand() % 2 == 0) ? (0.5f + static_cast<float>(rand()) / RAND_MAX * 1.5f) : (-0.5f - static_cast<float>(rand()) / RAND_MAX * 1.5f);
+                    lg->velocity = glm::vec3(vx, 0.0f, 0.0f);
+                    logs.push_back(lg);
+                }
+            }
+        }
+    }
+    std::cout << "Initial logs spawned: " << logs.size() << std::endl;
+    // Diagnostic: print raft load status and spawned raft transforms to help debug visibility
+    std::cout << "Raft model loaded: " << (raftModel != nullptr ? "YES" : "NO") << std::endl;
+    for (size_t i = 0; i < logs.size(); ++i) {
+        auto lg = logs[i];
+        std::cout << " Raft[" << i << "] pos=(" << lg->position.x << "," << lg->position.y << "," << lg->position.z << ") ";
+        std::cout << " rot=(" << lg->rotation.x << "," << lg->rotation.y << "," << lg->rotation.z << ")";
+        std::cout << " scale=(" << lg->scale.x << "," << lg->scale.y << "," << lg->scale.z << ")" << std::endl;
     }
     
     // Create multiple cars - กระจายตามเลน (Z axis) พร้อมการเว้นช่องห่าง
@@ -312,6 +382,39 @@ int main()
                     std::cout << "Picked up a heart! Hearts=" << playerHearts << std::endl;
                     delete hg;
                     hearts.erase(hearts.begin() + h);
+                }
+            }
+
+            // Update logs: move and wrap/spawn
+            for (int li = (int)logs.size() - 1; li >= 0; --li) {
+                GameObject* lg = logs[li];
+                lg->Update(deltaTime);
+
+                // If log moves too far out of the world bounds, wrap it to the other side
+                if (lg->position.x < -600.0f) lg->position.x = 600.0f;
+                if (lg->position.x > 600.0f) lg->position.x = -600.0f;
+            }
+
+            // Check if player is standing on a log when in a lake zone
+            int playerBaseZone2 = static_cast<int>(std::floor(-player->position.z / TEXTURE_ZONE_SIZE));
+            bool playerOnAnyLog = false;
+            for (auto lg : logs) {
+                // If collision with log, consider player standing on it
+                if (player->CheckCollision(lg, 0.0f)) {
+                    playerOnAnyLog = true;
+                    // Move player horizontally with the log so they ride it
+                    player->position.x += lg->velocity.x * deltaTime;
+                    // Ensure player's vertical position stays on the log (simple snap)
+                    player->position.y = lg->position.y + 0.1f;
+                    break;
+                }
+            }
+
+            // If player is over water and not on a log and not jumping, they fall and die
+            if (mod3(playerBaseZone2) == 1) { // lake
+                if (!playerOnAnyLog && !player->isJumping) {
+                    gameOver = true;
+                    std::cout << "\n=== You fell into the water! ===" << std::endl;
                 }
             }
 
@@ -464,6 +567,22 @@ int main()
                 h->Draw();
             }
         }
+
+        // Render rafts (previously logs)
+            for (auto lg : logs) {
+                shader.setMat4("model", lg->GetModelMatrix());
+                if (raftModel) {
+                    // Force a light-brown color for the raft (override model textures)
+                    shader.setVec3("objectColor", glm::vec3(0.82f, 0.71f, 0.55f)); // light brown
+                    shader.setBool("overrideColor", true);
+                    raftModel->Draw();
+                    shader.setBool("overrideColor", false);
+                } else {
+                    // Fallback: brown box for rafts
+                    shader.setVec3("objectColor", glm::vec3(0.45f, 0.26f, 0.08f));
+                    lg->Draw();
+                }
+            }
 
         // Swap buffers and poll events
         glfwSwapBuffers(window);

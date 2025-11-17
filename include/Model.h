@@ -420,13 +420,42 @@ private:
                 indices.push_back(face.mIndices[j]);
         }
 
-        // Try to load appropriate texture for this mesh
+        // Try to load an explicit material texture from the model (preferred)
         std::vector<unsigned int> meshTextures;
-        unsigned int texID = getTextureForMesh(nodeName);
-        if (texID != 0) {
-            meshTextures.push_back(texID);
+        if (mesh->mMaterialIndex >= 0 && scene && scene->mMaterials) {
+            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+            aiString texPath;
+            if (material->GetTextureCount(aiTextureType_DIFFUSE) > 0 && material->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS) {
+                std::string textureFile = texPath.C_Str();
+                // Try relative to model directory first
+                std::string tryPath = directory + "/" + textureFile;
+                std::ifstream f(tryPath);
+                if (f.good()) {
+                    f.close();
+                    unsigned int tid = loadTexture(tryPath.c_str());
+                    if (tid != 0) meshTextures.push_back(tid);
+                } else {
+                    f.close();
+                    // Try texture next to project assets
+                    std::string altPath = "assets/" + textureFile;
+                    std::ifstream f2(altPath);
+                    if (f2.good()) {
+                        f2.close();
+                        unsigned int tid = loadTexture(altPath.c_str());
+                        if (tid != 0) meshTextures.push_back(tid);
+                    } else {
+                        f2.close();
+                    }
+                }
+            }
         }
-        
+
+        // If no material texture found, fall back to existing heuristics
+        if (meshTextures.empty()) {
+            unsigned int texID = getTextureForMesh(nodeName);
+            if (texID != 0) meshTextures.push_back(texID);
+        }
+
         Mesh m(vertices, indices, meshTextures);
         // Attempt to read material diffuse color from Assimp material; use it as mesh diffuseColor
         if (mesh->mMaterialIndex >= 0 && scene && scene->mMaterials) {
