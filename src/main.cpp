@@ -207,7 +207,7 @@ int main()
     }
     
     // Start playing background music
-    std::string musicPath = "assets/Zambolino - Beautiful Day (freetouse.com).mp3";
+    std::string musicPath = "assets/sound/Zambolino - Beautiful Day (freetouse.com).mp3";
     if (!audioManager.PlayMusic(musicPath)) {
         std::cerr << "Warning: Could not load music from " << musicPath << std::endl;
         std::cerr << "Note: MP3 files are not supported. Please convert to WAV format." << std::endl;
@@ -372,7 +372,7 @@ int main()
                     playerHearts++;
                     std::cout << "Picked up a heart! Hearts=" << playerHearts << std::endl;
                     // Play sound effect
-                    audioManager.PlaySoundEffect("assets/retro-coin-4-236671.mp3");
+                    audioManager.PlaySoundEffect("assets/sound/retro-coin-4-236671.mp3");
                     delete hg;
                     hearts.erase(hearts.begin() + h);
                 }
@@ -397,6 +397,8 @@ int main()
                 if (playerInWater) {
                     gameOver = true;
                     std::cout << "\n=== You fell into the water! ===" << std::endl;
+                    // Play water splash sound effect
+                    audioManager.PlaySoundEffect("assets/sound/water-splash-199583.mp3");
                 }
             }
 
@@ -411,6 +413,8 @@ int main()
                     if (playerHearts > 0) {
                         playerHearts--;
                         std::cout << "Hit by car! Hearts left=" << playerHearts << std::endl;
+                        // Play collision sound effect
+                        audioManager.PlaySoundEffect("assets/sound/fast-collision-reverb-14611.mp3");
                         // remove car to avoid repeated hits
                         delete cars[i];
                         cars.erase(cars.begin() + i);
@@ -421,6 +425,8 @@ int main()
                         std::cout << "You got hit by a car!" << std::endl;
                         std::cout << "Final Score: " << score << std::endl;
                         std::cout << "Press ESC to exit" << std::endl;
+                        // Play collision sound effect
+                        audioManager.PlaySoundEffect("assets/sound/fast-collision-reverb-14611.mp3");
                     }
                 }
                 

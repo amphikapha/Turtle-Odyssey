@@ -130,6 +130,8 @@ bool AudioManager::LoadAudioFile(const std::string& filePath, ALuint& buffer)
     
     if (numFrames != sfInfo.frames) {
         std::cerr << "Warning: Read " << numFrames << " frames instead of " << sfInfo.frames << std::endl;
+        // Adjust the size to actual frames read
+        audioData.resize(numFrames * sfInfo.channels);
     }
 
     sf_close(file);
@@ -145,9 +147,14 @@ bool AudioManager::LoadAudioFile(const std::string& filePath, ALuint& buffer)
         return false;
     }
 
-    // Create OpenAL buffer
+    // If buffer ID is 0, generate a new one (otherwise reuse existing)
     if (buffer == 0) {
         alGenBuffers(1, &buffer);
+        ALenum genError = alGetError();
+        if (genError != AL_NO_ERROR) {
+            std::cerr << "OpenAL error while generating buffer: " << genError << std::endl;
+            return false;
+        }
     }
 
     // Upload audio data to buffer
@@ -270,17 +277,45 @@ void AudioManager::PlaySoundEffect(const std::string& filePath)
         return;
     }
 
-    // Load audio file into the target buffer
+    // Delete old buffer data if exists to free memory
+    if (targetBuffer != 0) {
+        alDeleteBuffers(1, &targetBuffer);
+        ALenum deleteError = alGetError();
+        if (deleteError != AL_NO_ERROR) {
+            std::cerr << "Warning: Error deleting old buffer: " << deleteError << std::endl;
+        }
+    }
+
+    // Create new buffer
+    alGenBuffers(1, &targetBuffer);
+    ALenum genError = alGetError();
+    if (genError != AL_NO_ERROR) {
+        std::cerr << "Error generating buffer: " << genError << std::endl;
+        return;
+    }
+
+    // Load audio file into the new buffer
     if (!LoadAudioFile(filePath, targetBuffer)) {
+        alDeleteBuffers(1, &targetBuffer);
         return;
     }
 
     // Update the buffer ID in our array
     effectBuffers[targetIndex] = targetBuffer;
 
-    // Attach buffer to source and play
+    // Stop and detach any previous buffer
+    alSourceStop(targetSource);
+    alSourcei(targetSource, AL_BUFFER, 0);
+
+    // Attach new buffer to source and play
     alSourcei(targetSource, AL_BUFFER, targetBuffer);
     alSourcePlay(targetSource);
+
+    ALenum playError = alGetError();
+    if (playError != AL_NO_ERROR) {
+        std::cerr << "Error playing sound: " << playError << std::endl;
+        return;
+    }
 
     std::cout << "Playing sound effect: " << filePath << std::endl;
 }
