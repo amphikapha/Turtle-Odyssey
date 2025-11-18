@@ -352,6 +352,62 @@ private:
                 f.close();
             }
         }
+        // Load textures for SimpleTunnel model
+        else if (modelPath.find("SimpleTunnel") != std::string::npos) {
+            // Use the COLOR texture for SimpleTunnel
+            std::string textureName = "T_SimpleTunnel_COL.png";
+            
+            // Try different possible texture paths
+            std::vector<std::string> possiblePaths = {
+                directory + "/../textures/" + textureName,
+                directory + "/textures/" + textureName,
+                "assets/SimpleTunnel/textures/" + textureName
+            };
+            
+            for (const auto& texturePath : possiblePaths) {
+                std::ifstream f(texturePath);
+                if (f.good()) {
+                    f.close();
+                    unsigned int textureID = loadTexture(texturePath.c_str());
+                    if (textureID != 0) {
+                        std::cout << "Successfully loaded tunnel texture: " << texturePath << std::endl;
+                        return textureID;
+                    }
+                }
+                f.close();
+            }
+        }
+        // Load textures for Bridge model (bridge.glb)
+        else if (modelPath.find("bridge") != std::string::npos && modelPath.find(".glb") != std::string::npos) {
+            // Try to load bridge PNG textures
+            std::vector<std::string> bridgeTextures = {
+                "Bridge_Material_Base_Color.png",
+                "Bridge_Material_Metallic.png",
+                "Bridge_Material_Normal_DirectX.png",
+                "Bridge_Material_Roughness.png"
+            };
+            
+            for (const auto& textureName : bridgeTextures) {
+                std::vector<std::string> possiblePaths = {
+                    "assets/bridge/textures/" + textureName,
+                    directory + "/../textures/" + textureName,
+                    directory + "/" + textureName
+                };
+                
+                for (const auto& texturePath : possiblePaths) {
+                    std::ifstream f(texturePath);
+                    if (f.good()) {
+                        f.close();
+                        unsigned int textureID = loadTexture(texturePath.c_str());
+                        if (textureID != 0) {
+                            std::cout << "Successfully loaded bridge texture: " << texturePath << std::endl;
+                            return textureID;
+                        }
+                    }
+                    f.close();
+                }
+            }
+        }
         
         return 0;
     }

@@ -37,6 +37,9 @@ bool keysProcessed[1024] = { false };
 // Audio manager (global for key callbacks)
 AudioManager* g_audioManager = nullptr;
 
+// Models (global for reset access)
+Model* g_tunnelModel = nullptr;
+
 // Camera - อยู่ด้านหลังและสูงขึ้น
 Camera camera(glm::vec3(0.0f, 6.0f, 12.0f));
 
@@ -54,7 +57,7 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
 unsigned int createGroundPlane();
 void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 projection);
 unsigned int loadTexture(const char* path);
-void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, int& playerHearts, int& score);
+void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, std::vector<GameObject*>& tunnels, int& playerHearts, int& score);
 
 int main()
 {
@@ -162,6 +165,21 @@ int main()
         }
     }
 
+    // Load bridge model for car spawn hiding
+    Model* tunnelModel = new Model();
+    std::cout << "Attempting to load bridge model from: assets/bridge.glb" << std::endl;
+    bool bridgeModelLoaded = tunnelModel->loadModel("assets/bridge.glb");
+    if (!bridgeModelLoaded) {
+        std::cout << "Warning: Could not load bridge model from assets/bridge.glb - trying alternative formats..." << std::endl;
+        delete tunnelModel;
+        tunnelModel = nullptr;
+    } else {
+        std::cout << "Successfully loaded bridge model from assets/bridge.glb" << std::endl;
+    }
+
+    // Tunnels to hide car spawning (left and right sides)
+    std::vector<GameObject*> tunnels;
+
     // One heart per grass zone: track which grass zones already had a heart spawned or consumed
     std::set<int> heartZonesUsed;
     std::vector<GameObject*> hearts; // GameObject per heart for collision and transform
@@ -177,6 +195,24 @@ int main()
         // If no model, shrink marker
         if (!heartModel) h->scale = glm::vec3(0.5f);
         hearts.push_back(h);
+    };
+
+    // Helper lambda for spawning tunnels in street zones
+    auto spawnTunnelInZone = [&](int zoneIndex) {
+        if (tunnelModel == nullptr) return;
+        
+        float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+        
+        // Spawn bridge model - tuned scale for game feel
+        GameObject* bridge = new GameObject();
+        bridge->position = glm::vec3(0.0f, 1.0f, z);  // Center, elevated
+        bridge->scale = glm::vec3(0.001f, 0.001f, 0.001f);
+        bridge->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
+        
+        std::cout << "Spawning bridge at zone " << zoneIndex << " position: (" << bridge->position.x << ", " 
+                  << bridge->position.y << ", " << bridge->position.z << ") scale: " << bridge->scale.x << std::endl;
+        
+        tunnels.push_back(bridge);
     };
 
     // Spawn initial hearts for upcoming grass zones (a few ahead)
@@ -203,6 +239,8 @@ int main()
         std::cout << "Zone " << z << ": mod3=" << zoneMod << std::endl;
         if (zoneMod == 0) { // grass zone
             spawnHeartInZone(z);
+        } else if (zoneMod == 2) { // street zone
+            spawnTunnelInZone(z);
         }
     }
     
@@ -286,7 +324,7 @@ int main()
 
         // Check for reset key when game is over
         if (gameOver && keys[GLFW_KEY_R]) {
-            resetGame(player, cars, heartZonesUsed, hearts, playerHearts, score);
+            resetGame(player, cars, heartZonesUsed, hearts, tunnels, playerHearts, score);
         }
 
         // Update audio system
@@ -307,6 +345,18 @@ int main()
                 if (mod3(z) == 0 && heartZonesUsed.count(z) == 0) {
                     // small chance to spawn (so not every grass has one) - set to always spawn for now
                     spawnHeartInZone(z);
+                }
+            }
+
+            // Spawn bridges ahead on newly discovered street zones (hide car spawning)
+            std::set<int> existingTunnelZones;
+            for (auto t : tunnels) {
+                int tz = static_cast<int>(std::floor(-t->position.z / TEXTURE_ZONE_SIZE));
+                existingTunnelZones.insert(tz);
+            }
+            for (int z = playerBaseZone; z <= playerBaseZone + 12; ++z) {
+                if (mod3(z) == 2 && existingTunnelZones.count(z) == 0) {
+                    spawnTunnelInZone(z);
                 }
             }
 
@@ -446,6 +496,14 @@ int main()
                 }
             }
 
+            // Remove tunnels that are too far behind
+            for (int i = (int)tunnels.size() - 1; i >= 0; --i) {
+                if (tunnels[i]->position.z > player->position.z + CAR_DESPAWN_DISTANCE) {
+                    delete tunnels[i];
+                    tunnels.erase(tunnels.begin() + i);
+                }
+            }
+
             // Update score based on forward progress
             // คะแนนเพิ่มเมื่อเดินไปข้างหน้า (Z ลดลง) - ไม่มีขีดจำกัด
             int newScore = static_cast<int>(-player->position.z / 2.0f);
@@ -559,6 +617,16 @@ int main()
             }
         }
 
+        // Render bridges (hide car spawning on street zones)
+        for (auto t : tunnels) {
+            shader.setMat4("model", t->GetModelMatrix());
+            shader.setVec3("objectColor", glm::vec3(0.8f, 0.7f, 0.6f)); // Light brown/bridge color
+            if (tunnelModel) {
+                std::cout << "Rendering bridge at: (" << t->position.x << ", " << t->position.y << ", " << t->position.z << ")" << std::endl;
+                tunnelModel->Draw();
+            }
+        }
+
         // Bridges are now rendered as ground texture in lake zones instead of separate objects
 
         // Swap buffers and poll events
@@ -572,6 +640,16 @@ int main()
         delete cars[i];
     }
     cars.clear();
+    for (size_t i = 0; i < hearts.size(); ++i) {
+        delete hearts[i];
+    }
+    hearts.clear();
+    for (size_t i = 0; i < tunnels.size(); ++i) {
+        delete tunnels[i];
+    }
+    tunnels.clear();
+    if (heartModel) delete heartModel;
+    if (tunnelModel) delete tunnelModel;
     glDeleteVertexArrays(1, &groundVAO);
     glDeleteTextures(3, groundTextures);
 
@@ -826,7 +904,7 @@ unsigned int loadTexture(const char* path)
     return textureID;
 }
 
-void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, int& playerHearts, int& score)
+void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, std::vector<GameObject*>& tunnels, int& playerHearts, int& score)
 {
     // Clean up old player
     if (player != nullptr) {
@@ -844,6 +922,12 @@ void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZon
         delete hearts[i];
     }
     hearts.clear();
+
+    // Clean up old tunnels
+    for (size_t i = 0; i < tunnels.size(); ++i) {
+        delete tunnels[i];
+    }
+    tunnels.clear();
 
     // Reset game state variables
     score = 0;
@@ -885,11 +969,26 @@ void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZon
         hearts.push_back(h);
     };
 
+    auto spawnTunnelInZone = [&](int zoneIndex) {
+        if (g_tunnelModel == nullptr) return;
+        
+        float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+        
+        // Spawn left tunnel only (negative X) - smaller size, rotated 90 degrees, far edge
+        GameObject* leftTunnel = new GameObject();
+        leftTunnel->position = glm::vec3(-60.0f, 2.0f, z);  // Move much further to the left edge
+        leftTunnel->scale = glm::vec3(7.0f, 6.0f, 6.0f);    // Reduced size
+        leftTunnel->rotation = glm::vec3(0.0f, glm::radians(90.0f), 0.0f);  // Rotate 90 degrees around Y axis
+        tunnels.push_back(leftTunnel);
+    };
+
     // Recreate hearts in starting zones
     int startZone = static_cast<int>(std::floor(-player->position.z / TEXTURE_ZONE_SIZE));
     for (int z = startZone; z <= startZone + 8; ++z) {
         if (mod3(z) == 0) {
             spawnHeartInZone(z);
+        } else if (mod3(z) == 2) {
+            spawnTunnelInZone(z);
         }
     }
 
