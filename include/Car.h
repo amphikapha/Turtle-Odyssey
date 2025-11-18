@@ -28,11 +28,11 @@ public:
         // รถวิ่งแนวนอน (X axis)
         if (movingRight) {
             position.x = -30.0f;  // เริ่มทางซ้าย
-            velocity.x = 5.0f + (rand() % 3); // วิ่งไปขวา
+            velocity.x = 10.0f + (rand() % 4); // วิ่งไปขวา (10-13 units/sec)
             rotation.y = 90.0f;  // หมุนหันไปขวา
         } else {
             position.x = 30.0f;   // เริ่มทางขวา
-            velocity.x = -(5.0f + (rand() % 3)); // วิ่งไปซ้าย
+            velocity.x = -(10.0f + (rand() % 4)); // วิ่งไปซ้าย (10-13 units/sec)
             rotation.y = -90.0f; // หมุนหันไปซ้าย
         }
 
@@ -64,7 +64,7 @@ public:
         model = new Model();
         useModel = model->loadModel(path);
         if (useModel) {
-            std::cout << "Car model loaded from: " << path << std::endl;
+            // std::cout << "Car model loaded from: " << path << std::endl;
         } else {
             std::cout << "Could not load car model, using fallback cube" << std::endl;
             delete model;

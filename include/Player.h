@@ -23,7 +23,7 @@ public:
         scale = glm::vec3(1.0f, 1.0f, 1.0f);
         rotation = glm::vec3(0.0f, 0.0f, 0.0f); // Face forward
         color = glm::vec3(1.0f, 1.0f, 1.0f);
-        moveSpeed = 5.0f;
+        moveSpeed = 8.0f;
         jumpHeight = 2.0f;
         isJumping = false;
         jumpVelocity = 0.0f;

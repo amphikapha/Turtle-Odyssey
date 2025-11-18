@@ -660,7 +660,6 @@ int main()
             shader.setMat4("model", t->GetModelMatrix());
             shader.setVec3("objectColor", glm::vec3(0.8f, 0.7f, 0.6f)); // Light brown/bridge color
             if (tunnelModel) {
-                std::cout << "Rendering bridge at: (" << t->position.x << ", " << t->position.y << ", " << t->position.z << ")" << std::endl;
                 tunnelModel->Draw();
             }
         }
@@ -731,6 +730,8 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
         player->ActivateSpeedBoost();
         keysProcessed[GLFW_KEY_LEFT_SHIFT] = true;
         std::cout << "Speed Boost Activated! (5 seconds)" << std::endl;
+        // Play running sound effect
+        audioManager->PlaySoundEffect("assets/sound/running-on-the-floor-359909.mp3");
     }
 }
 
