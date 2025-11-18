@@ -59,7 +59,6 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
 unsigned int createGroundPlane();
 void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 projection);
 unsigned int loadTexture(const char* path);
-void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, std::set<int>& potionZonesUsed, std::vector<GameObject*>& potions, std::vector<GameObject*>& tunnels, int& playerHearts, int& score);
 
 int main()
 {
@@ -387,11 +386,6 @@ int main()
 
         // Input
         processInput(window, player, &audioManager);
-
-        // Check for reset key when game is over
-        if (gameOver && keys[GLFW_KEY_R]) {
-            resetGame(player, cars, heartZonesUsed, hearts, potionZonesUsed, potions, tunnels, playerHearts, score);
-        }
 
         // Update audio system
         audioManager.Update();
@@ -865,12 +859,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
     }
 
-    // Restart game when 'R' is pressed (only when game is over)
-    if (key == GLFW_KEY_R && action == GLFW_PRESS && gameOver) {
-        std::cout << "Restarting game..." << std::endl;
-        gameOver = false;
-    }
-
     if (key >= 0 && key < 1024)
     {
         if (action == GLFW_PRESS)
@@ -1047,152 +1035,4 @@ unsigned int loadTexture(const char* path)
     std::cout << "Successfully loaded texture: " << path << " (" << width << "x" << height << ")" << std::endl;
 
     return textureID;
-}
-
-void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, std::set<int>& potionZonesUsed, std::vector<GameObject*>& potions, std::vector<GameObject*>& tunnels, int& playerHearts, int& score)
-{
-    // Clean up old player
-    if (player != nullptr) {
-        delete player;
-    }
-
-    // Clean up old cars
-    for (size_t i = 0; i < cars.size(); ++i) {
-        delete cars[i];
-    }
-    cars.clear();
-
-    // Clean up old hearts
-    for (size_t i = 0; i < hearts.size(); ++i) {
-        delete hearts[i];
-    }
-    hearts.clear();
-
-    // Clean up old potions
-    for (size_t i = 0; i < potions.size(); ++i) {
-        delete potions[i];
-    }
-    potions.clear();
-
-    // Clean up old tunnels
-    for (size_t i = 0; i < tunnels.size(); ++i) {
-        delete tunnels[i];
-    }
-    tunnels.clear();
-
-    // Reset game state variables
-    score = 0;
-    playerHearts = 1;
-    lastCarSpawnZ = 0.0f;
-    heartZonesUsed.clear();
-    potionZonesUsed.clear();
-
-    // Recreate player at starting position
-    player = new Player(glm::vec3(0.0f, 0.5f, 15.0f));
-    camera.FollowTarget(player->position);
-
-    // Helper lambda functions (same as in main)
-    const float TEXTURE_ZONE_SIZE = 40.0f;
-    const int NUM_LANES = 10;
-    const float LANE_WIDTH = 6.0f;
-    const int STREET_ZONE_MOD = 2;
-
-    auto mod3 = [](int v) {
-        int m = v % 3;
-        if (m < 0) m += 3;
-        return m;
-    };
-
-    auto getNearestStreetZoneIndex = [&](float referenceZ, int minAheadZones = 1) {
-        int baseZone = static_cast<int>(std::floor(-referenceZ / TEXTURE_ZONE_SIZE));
-        int targetZone = baseZone + minAheadZones;
-        while (mod3(targetZone) != STREET_ZONE_MOD) ++targetZone;
-        return targetZone;
-    };
-
-    auto spawnHeartInZone = [&](int zoneIndex) {
-        if (heartZonesUsed.count(zoneIndex)) return;
-        heartZonesUsed.insert(zoneIndex);
-
-        float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
-        GameObject* h = new GameObject();
-        h->position = glm::vec3(0.0f, 4.0f, z);
-        h->scale = glm::vec3(1.0f, 1.0f, 1.0f);
-        hearts.push_back(h);
-    };
-
-    auto spawnTunnelInZone = [&](int zoneIndex) {
-        if (g_tunnelModel == nullptr) return;
-        
-        float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
-        
-        // Spawn left bridge
-        GameObject* bridgeLeft = new GameObject();
-        bridgeLeft->position = glm::vec3(-40.0f, 1.0f, z);  // Left side, elevated
-        bridgeLeft->scale = glm::vec3(0.04f, 0.04f, 0.04f);
-        bridgeLeft->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
-        tunnels.push_back(bridgeLeft);
-        
-        // Spawn right bridge
-        GameObject* bridgeRight = new GameObject();
-        bridgeRight->position = glm::vec3(40.0f, 1.0f, z);  // Right side, elevated
-        bridgeRight->scale = glm::vec3(0.04f, 0.04f, 0.04f);
-        bridgeRight->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
-        tunnels.push_back(bridgeRight);
-    };
-
-    auto spawnPotionInZone = [&](int zoneIndex) {
-        if (potionZonesUsed.count(zoneIndex)) return;
-        potionZonesUsed.insert(zoneIndex);
-
-        float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
-        GameObject* p = new GameObject();
-        // Spawn to the left side of heart, closer to center
-        p->position = glm::vec3(-8.0f, 2.5f, z);
-        p->scale = glm::vec3(0.5f, 0.5f, 0.5f);
-        p->rotation = glm::vec3(-90.0f, 0.0f, 0.0f); // Upright
-        potions.push_back(p);
-    };
-
-    // Recreate hearts in starting zones
-    int startZone = static_cast<int>(std::floor(-player->position.z / TEXTURE_ZONE_SIZE));
-    bool firstGrassZone = true;
-    for (int z = startZone; z <= startZone + 8; ++z) {
-        if (mod3(z) == 0) {
-            spawnHeartInZone(z);
-            // Guarantee potion in first grass zone, then 33% chance for others
-            if (firstGrassZone) {
-                spawnPotionInZone(z);
-                firstGrassZone = false;
-            } else if (rand() % 3 == 0) { // 33% chance for subsequent zones
-                spawnPotionInZone(z);
-            }
-        } else if (mod3(z) == 2) {
-            spawnTunnelInZone(z);
-        }
-    }
-
-    // Recreate initial cars
-    for (int i = 0; i < 8; i++) {
-        int lane = (i % NUM_LANES) - (NUM_LANES / 2);
-        bool movingRight = (rand() % 2 == 0);
-        Car* car = new Car(lane, LANE_WIDTH, movingRight);
-        
-        if (movingRight) {
-            car->position.x = -50.0f + (i * 18.0f);
-        } else {
-            car->position.x = 50.0f - (i * 18.0f);
-        }
-        
-        car->position.y = 0.3f + (lane * 0.1f);
-        
-        int extraAheadZones = 1 + (i / 3);
-        int initZone = getNearestStreetZoneIndex(player->position.z, extraAheadZones);
-        car->position.z = - (initZone * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f) + lane * LANE_WIDTH;
-
-        cars.push_back(car);
-    }
-
-    std::cout << "=== GAME RESET ===" << std::endl;
-    std::cout << "Lives: " << playerHearts << " | Score: " << score << std::endl;
 }
