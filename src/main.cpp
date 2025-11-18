@@ -9,6 +9,7 @@
 #include "Player.h"
 #include "Car.h"
 #include "AudioManager.h"
+#include "Cubemap.h"
 
 #include <iostream>
 #include <vector>
@@ -107,6 +108,20 @@ int main()
 
     // Build and compile shaders
     Shader shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl");
+
+    // Load cubemap for skybox
+    Cubemap* cubemap = new Cubemap();
+    cubemap->LoadCubemap(
+        "assets/cubemap/px.png",  // posX (right)
+        "assets/cubemap/nx.png",  // negX (left)
+        "assets/cubemap/py.png",  // posY (top)
+        "assets/cubemap/ny.png",  // negY (bottom)
+        "assets/cubemap/pz.png",  // posZ (front)
+        "assets/cubemap/nz.png"   // negZ (back)
+    );
+    cubemap->SetupMesh();
+
+    Shader skyboxShader("shaders/skybox_vertex.glsl", "shaders/skybox_fragment.glsl");
 
     // Create game objects
     Player* player = new Player(glm::vec3(0.0f, 0.5f, 15.0f));
@@ -525,12 +540,20 @@ int main()
         glClearColor(0.53f, 0.81f, 0.92f, 1.0f); // Sky blue
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Activate shader
+        // Render skybox first (before other objects)
+        glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
+        skyboxShader.use();
+        glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 200.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        skyboxShader.setMat4("projection", projection);
+        skyboxShader.setMat4("view", view);
+        cubemap->Draw();
+        glDepthFunc(GL_LESS); // Set depth function back to default
+
+        // Activate shader for regular objects
         shader.use();
 
         // View/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 200.0f);
-        glm::mat4 view = camera.GetViewMatrix();
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
 
@@ -655,6 +678,7 @@ int main()
     tunnels.clear();
     if (heartModel) delete heartModel;
     if (tunnelModel) delete tunnelModel;
+    if (cubemap) delete cubemap;
     glDeleteVertexArrays(1, &groundVAO);
     glDeleteTextures(3, groundTextures);
 
