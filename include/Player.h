@@ -92,10 +92,10 @@ public:
 
         position += direction * speed * deltaTime;
 
-        // Rotate turtle to face movement direction (ปิดไว้ก่อน)
-        // if (glm::length(direction) > 0.01f) {
-        //     rotation.y = glm::degrees(atan2(direction.x, direction.z));
-        // }
+        // Rotate turtle to face movement direction
+        if (glm::length(direction) > 0.01f) {
+            rotation.y = glm::degrees(atan2(direction.x, direction.z));
+        }
     }
 
     void Jump() {
