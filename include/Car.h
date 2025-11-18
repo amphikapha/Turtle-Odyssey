@@ -44,8 +44,8 @@ public:
         float b = 0.3f + static_cast<float>(rand()) / RAND_MAX * 0.7f;
         color = glm::vec3(r, g, b);
 
-        // Try to load model
-        LoadModel("assets/free-retro-american-car-cartoon-low-poly/source/RetroCar/RetroCar.obj");
+    // Try to load model (new assets path under assets/models)
+    LoadModel("assets/models/free-retro-american-car-cartoon-low-poly/source/RetroCar/RetroCar.obj");
         
         // Fallback to cube if model not found
         if (!useModel) {

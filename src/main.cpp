@@ -173,9 +173,9 @@ int main()
 
     // Load heart model (try OBJ then FBX)
     Model* heartModel = new Model();
-    bool heartModelLoaded = heartModel->loadModel("assets/22_ Heart/Heart.obj");
+    bool heartModelLoaded = heartModel->loadModel("assets/models/22_ Heart/Heart.obj");
     if (!heartModelLoaded) {
-        heartModelLoaded = heartModel->loadModel("assets/22_ Heart/Heart.fbx");
+        heartModelLoaded = heartModel->loadModel("assets/models/22_ Heart/Heart.fbx");
         if (!heartModelLoaded) {
             delete heartModel;
             heartModel = nullptr;
@@ -194,8 +194,8 @@ int main()
 
     // Load bridge model for car spawn hiding
     Model* tunnelModel = new Model();
-    std::cout << "Attempting to load bridge model from: assets/bridge.glb" << std::endl;
-    bool bridgeModelLoaded = tunnelModel->loadModel("assets/bridge.glb");
+    std::cout << "Attempting to load bridge model from: assets/models/bridge.glb" << std::endl;
+    bool bridgeModelLoaded = tunnelModel->loadModel("assets/models/bridge.glb");
     if (!bridgeModelLoaded) {
         std::cout << "Warning: Could not load bridge model from assets/bridge.glb - trying alternative formats..." << std::endl;
         delete tunnelModel;

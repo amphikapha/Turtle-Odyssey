@@ -35,8 +35,8 @@ public:
         model = nullptr;
         useModel = false;
 
-        // Try to load goblin model
-        LoadModel("assets/goblin-3d-model-free/source/GoblinMutantSPDONEFINAL.fbx");
+    // Try to load goblin model (new assets path under assets/models)
+    LoadModel("assets/models/goblin-3d-model-free/source/GoblinMutantSPDONEFINAL.fbx");
         
         // Fallback to cube if model not found
         if (!useModel) {
