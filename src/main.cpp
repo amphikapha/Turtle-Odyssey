@@ -320,6 +320,11 @@ int main()
     glm::vec3 lightPos(0.0f, 20.0f, 0.0f);
     glm::vec3 lightColor(1.0f, 1.0f, 0.9f);
 
+    // Fog settings
+    float fogNear = 50.0f;      // Distance where fog starts (in units)
+    float fogFar = 180.0f;      // Distance where fog is complete
+    glm::vec3 fogColor(0.0f, 0.0f, 0.0f); // Black fog - makes distant objects fade to black
+
     std::cout << "=== Turtle Odyssey ===" << std::endl;
     std::cout << "Controls:" << std::endl;
     std::cout << "W/A/S/D - Move" << std::endl;
@@ -564,6 +569,11 @@ int main()
         shader.setVec3("lightPos", lightPos);
         shader.setVec3("lightColor", lightColor);
         shader.setVec3("viewPos", camera.Position);
+
+        // Fog uniforms
+        shader.setFloat("fogNear", fogNear);
+        shader.setFloat("fogFar", fogFar);
+        shader.setVec3("fogColor", fogColor);
 
         // Render multiple ground sections with different textures
         // This creates a continuous visible transition between terrain types

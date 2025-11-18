@@ -19,6 +19,11 @@ uniform sampler2D ourTexture; // default object texture (unit 0)
 uniform bool overrideColor; // when true, use objectColor for non-ground objects unconditionally
 uniform bool showBridgeInLake; // when true, show bridge texture in lake zones instead of water
 
+// Fog uniforms
+uniform float fogNear;
+uniform float fogFar;
+uniform vec3 fogColor;
+
 void main()
 {
     // Ambient - เพิ่มให้สว่างขึ้น
@@ -100,5 +105,13 @@ void main()
 
     // Apply lighting to the chosen color
     vec3 lit = (ambient + diffuse + specular) * finalColor;
-    FragColor = vec4(lit, 1.0);
+    
+    // Apply fog effect
+    float distance = length(FragPos - viewPos);
+    float fogFactor = (fogFar - distance) / (fogFar - fogNear);
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+    
+    vec3 finalLit = mix(fogColor, lit, fogFactor);
+    
+    FragColor = vec4(finalLit, 1.0);
 }
