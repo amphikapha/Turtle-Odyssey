@@ -410,24 +410,23 @@ int main()
                 // Check collision with player
                 // Use a small positive margin so the player dies when lightly touching the car
                 if (player->CheckCollision(cars[i], 1.f)) {
-                    if (playerHearts > 0) {
-                        playerHearts--;
-                        std::cout << "Hit by car! Hearts left=" << playerHearts << std::endl;
-                        // Play collision sound effect
-                        audioManager.PlaySoundEffect("assets/sound/fast-collision-reverb-14611.mp3");
-                        // remove car to avoid repeated hits
-                        delete cars[i];
-                        cars.erase(cars.begin() + i);
-                        continue;
-                    } else {
+                    playerHearts--;
+                    std::cout << "Hit by car! Hearts left=" << playerHearts << std::endl;
+                    // Play collision sound effect
+                    audioManager.PlaySoundEffect("assets/sound/fast-collision-reverb-14611.mp3");
+                    
+                    if (playerHearts <= 0) {
                         gameOver = true;
                         std::cout << "\n=== GAME OVER ===" << std::endl;
                         std::cout << "You got hit by a car!" << std::endl;
                         std::cout << "Final Score: " << score << std::endl;
                         std::cout << "Press ESC to exit" << std::endl;
-                        // Play collision sound effect
-                        audioManager.PlaySoundEffect("assets/sound/fast-collision-reverb-14611.mp3");
                     }
+                    
+                    // remove car to avoid repeated hits
+                    delete cars[i];
+                    cars.erase(cars.begin() + i);
+                    continue;
                 }
                 
                 // Safety: if a car somehow ends up on a non-street zone, remove it
@@ -467,7 +466,7 @@ int main()
         shader.use();
 
         // View/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 200.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 200.0f);
         glm::mat4 view = camera.GetViewMatrix();
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
