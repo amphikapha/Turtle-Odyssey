@@ -33,6 +33,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(OpenAL CONFIG REQUIRED)
 find_package(SndFile CONFIG REQUIRED)
+find_package(Freetype REQUIRED)
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} 
@@ -42,6 +43,7 @@ target_link_libraries(${PROJECT_NAME}
     assimp::assimp
     OpenAL::OpenAL
     SndFile::sndfile
+    Freetype::Freetype
 )
 
 # Copy shaders and assets to build directory

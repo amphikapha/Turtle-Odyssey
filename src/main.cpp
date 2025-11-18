@@ -10,6 +10,7 @@
 #include "Car.h"
 #include "AudioManager.h"
 #include "Cubemap.h"
+#include "TextRenderer.h"
 
 #include <iostream>
 #include <vector>
@@ -122,6 +123,9 @@ int main()
     cubemap->SetupMesh();
 
     Shader skyboxShader("shaders/skybox_vertex.glsl", "shaders/skybox_fragment.glsl");
+
+    // Create Text Renderer for on-screen display
+    TextRenderer* textRenderer = new TextRenderer(SCR_WIDTH, SCR_HEIGHT);
 
     // Create game objects
     Player* player = new Player(glm::vec3(0.0f, 0.5f, 15.0f));
@@ -472,6 +476,10 @@ int main()
                 if (playerInWater) {
                     gameOver = true;
                     std::cout << "\n=== You fell into the water! ===" << std::endl;
+                    std::cout << "Final Distance: " << score * 2 << " meters" << std::endl;
+                    std::cout << "Press ESC to exit or R to restart" << std::endl;
+                    std::string titleStr = "GAME OVER | Distance: " + std::to_string(score * 2) + "m";
+                    glfwSetWindowTitle(window, titleStr.c_str());
                     // Play water splash sound effect
                     audioManager.PlaySoundEffect("assets/sound/water-splash-199583.mp3");
                 }
@@ -494,8 +502,10 @@ int main()
                         gameOver = true;
                         std::cout << "\n=== GAME OVER ===" << std::endl;
                         std::cout << "You got hit by a car!" << std::endl;
-                        std::cout << "Final Score: " << score << std::endl;
-                        std::cout << "Press ESC to exit" << std::endl;
+                        std::cout << "Final Score: " << score << " meters" << std::endl;
+                        std::cout << "Press ESC to exit or R to restart" << std::endl;
+                        std::string titleStr = "GAME OVER | Distance: " + std::to_string(score * 2) + "m";
+                        glfwSetWindowTitle(window, titleStr.c_str());
                     }
                     
                     // remove car to avoid repeated hits
@@ -534,7 +544,9 @@ int main()
             int newScore = static_cast<int>(-player->position.z / 2.0f);
             if (newScore > score) {
                 score = newScore;
-                std::cout << "Distance: " << score * 2 << " meters | Cars active: " << cars.size() << std::endl;
+                // Update window title with distance and lives
+                std::string titleStr = "Turtle Odyssey | Distance: " + std::to_string(score * 2) + "m | Lives: " + std::to_string(playerHearts);
+                glfwSetWindowTitle(window, titleStr.c_str());
             }
 
             // Camera follows player
@@ -666,6 +678,13 @@ int main()
 
         // Bridges are now rendered as ground texture in lake zones instead of separate objects
 
+        // Draw HUD text on screen
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        textRenderer->RenderText("Distance: " + std::to_string(score * 2) + "m", 20.0f, 30.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+        textRenderer->RenderText("Lives: " + std::to_string(playerHearts), SCR_WIDTH - 200.0f, 30.0f, 1.0f, glm::vec3(1.0f, 0.3f, 0.3f), SCR_WIDTH, SCR_HEIGHT);
+        glDisable(GL_BLEND);
+
         // Swap buffers and poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -673,6 +692,7 @@ int main()
 
     // Cleanup
     delete player;
+    if (textRenderer) delete textRenderer;
     for (size_t i = 0; i < cars.size(); ++i) {
         delete cars[i];
     }
