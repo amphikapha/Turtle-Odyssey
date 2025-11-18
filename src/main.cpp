@@ -203,16 +203,21 @@ int main()
         
         float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
         
-        // Spawn bridge model - tuned scale for game feel
-        GameObject* bridge = new GameObject();
-        bridge->position = glm::vec3(0.0f, 1.0f, z);  // Center, elevated
-        bridge->scale = glm::vec3(0.001f, 0.001f, 0.001f);
-        bridge->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
+        // Spawn left bridge
+        GameObject* bridgeLeft = new GameObject();
+        bridgeLeft->position = glm::vec3(-40.0f, 1.0f, z);  // Left side, elevated
+        bridgeLeft->scale = glm::vec3(0.04f, 0.04f, 0.04f);
+        bridgeLeft->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
+        tunnels.push_back(bridgeLeft);
         
-        std::cout << "Spawning bridge at zone " << zoneIndex << " position: (" << bridge->position.x << ", " 
-                  << bridge->position.y << ", " << bridge->position.z << ") scale: " << bridge->scale.x << std::endl;
+        // Spawn right bridge
+        GameObject* bridgeRight = new GameObject();
+        bridgeRight->position = glm::vec3(40.0f, 1.0f, z);  // Right side, elevated
+        bridgeRight->scale = glm::vec3(0.04f, 0.04f, 0.04f);
+        bridgeRight->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
+        tunnels.push_back(bridgeRight);
         
-        tunnels.push_back(bridge);
+        std::cout << "Spawning bridges at zone " << zoneIndex << " - Left: (-40, 1, " << z << "), Right: (40, 1, " << z << ")" << std::endl;
     };
 
     // Spawn initial hearts for upcoming grass zones (a few ahead)
@@ -974,12 +979,19 @@ void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZon
         
         float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
         
-        // Spawn left tunnel only (negative X) - smaller size, rotated 90 degrees, far edge
-        GameObject* leftTunnel = new GameObject();
-        leftTunnel->position = glm::vec3(-60.0f, 2.0f, z);  // Move much further to the left edge
-        leftTunnel->scale = glm::vec3(7.0f, 6.0f, 6.0f);    // Reduced size
-        leftTunnel->rotation = glm::vec3(0.0f, glm::radians(90.0f), 0.0f);  // Rotate 90 degrees around Y axis
-        tunnels.push_back(leftTunnel);
+        // Spawn left bridge
+        GameObject* bridgeLeft = new GameObject();
+        bridgeLeft->position = glm::vec3(-40.0f, 1.0f, z);  // Left side, elevated
+        bridgeLeft->scale = glm::vec3(0.04f, 0.04f, 0.04f);
+        bridgeLeft->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
+        tunnels.push_back(bridgeLeft);
+        
+        // Spawn right bridge
+        GameObject* bridgeRight = new GameObject();
+        bridgeRight->position = glm::vec3(40.0f, 1.0f, z);  // Right side, elevated
+        bridgeRight->scale = glm::vec3(0.04f, 0.04f, 0.04f);
+        bridgeRight->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
+        tunnels.push_back(bridgeRight);
     };
 
     // Recreate hearts in starting zones
