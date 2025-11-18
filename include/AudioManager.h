@@ -30,12 +30,19 @@ public:
     // Check if music is playing
     bool IsMusicPlaying();
 
+    // Play a sound effect (one-shot, doesn't loop)
+    void PlaySoundEffect(const std::string& filePath);
+
 private:
     // OpenAL objects
     ALCdevice* device;
     ALCcontext* context;
     ALuint sourceId;
     ALuint bufferId;
+    
+    // Sound effect sources (for non-looping sounds)
+    ALuint effectSources[4];  // Up to 4 simultaneous sound effects
+    ALuint effectBuffers[4];
 
     // Audio data
     std::string currentMusicPath;

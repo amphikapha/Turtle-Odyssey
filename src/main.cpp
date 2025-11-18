@@ -371,6 +371,8 @@ int main()
                 if (player->CheckCollision(hg, 0.0f)) {
                     playerHearts++;
                     std::cout << "Picked up a heart! Hearts=" << playerHearts << std::endl;
+                    // Play sound effect
+                    audioManager.PlaySoundEffect("assets/retro-coin-4-236671.mp3");
                     delete hg;
                     hearts.erase(hearts.begin() + h);
                 }

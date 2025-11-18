@@ -5,6 +5,10 @@ AudioManager::AudioManager()
     : device(nullptr), context(nullptr), sourceId(0), bufferId(0), 
       musicLoaded(false), isPlaying(false) 
 {
+    for (int i = 0; i < 4; ++i) {
+        effectSources[i] = 0;
+        effectBuffers[i] = 0;
+    }
 }
 
 AudioManager::~AudioManager() 
@@ -17,6 +21,16 @@ AudioManager::~AudioManager()
     }
     if (bufferId != 0) {
         alDeleteBuffers(1, &bufferId);
+    }
+    
+    // Clean up sound effect sources and buffers
+    for (int i = 0; i < 4; ++i) {
+        if (effectSources[i] != 0) {
+            alDeleteSources(1, &effectSources[i]);
+        }
+        if (effectBuffers[i] != 0) {
+            alDeleteBuffers(1, &effectBuffers[i]);
+        }
     }
     
     if (context != nullptr) {
@@ -68,6 +82,18 @@ bool AudioManager::Initialize()
     if (sourceId == 0) {
         std::cerr << "Failed to generate audio source" << std::endl;
         return false;
+    }
+
+    // Generate sound effect sources
+    alGenSources(4, effectSources);
+    for (int i = 0; i < 4; ++i) {
+        if (effectSources[i] != 0) {
+            alSourcef(effectSources[i], AL_PITCH, 1.0f);
+            alSourcef(effectSources[i], AL_GAIN, 1.0f);
+            alSource3f(effectSources[i], AL_POSITION, 0.0f, 0.0f, 0.0f);
+            alSource3f(effectSources[i], AL_VELOCITY, 0.0f, 0.0f, 0.0f);
+            alSourcei(effectSources[i], AL_LOOPING, AL_FALSE);
+        }
     }
 
     // Set source properties
@@ -211,4 +237,50 @@ bool AudioManager::IsMusicPlaying()
     ALint state;
     alGetSourcei(sourceId, AL_SOURCE_STATE, &state);
     return (state == AL_PLAYING);
+}
+
+void AudioManager::PlaySoundEffect(const std::string& filePath)
+{
+    if (device == nullptr) {
+        std::cerr << "Audio system not initialized" << std::endl;
+        return;
+    }
+
+    // Find an available effect source that's not currently playing
+    ALuint targetSource = 0;
+    ALuint targetBuffer = 0;
+    int targetIndex = -1;
+
+    for (int i = 0; i < 4; ++i) {
+        if (effectSources[i] == 0) continue;
+
+        ALint state;
+        alGetSourcei(effectSources[i], AL_SOURCE_STATE, &state);
+        
+        if (state != AL_PLAYING) {
+            targetSource = effectSources[i];
+            targetBuffer = effectBuffers[i];
+            targetIndex = i;
+            break;
+        }
+    }
+
+    if (targetSource == 0) {
+        std::cerr << "No available effect sources" << std::endl;
+        return;
+    }
+
+    // Load audio file into the target buffer
+    if (!LoadAudioFile(filePath, targetBuffer)) {
+        return;
+    }
+
+    // Update the buffer ID in our array
+    effectBuffers[targetIndex] = targetBuffer;
+
+    // Attach buffer to source and play
+    alSourcei(targetSource, AL_BUFFER, targetBuffer);
+    alSourcePlay(targetSource);
+
+    std::cout << "Playing sound effect: " << filePath << std::endl;
 }
