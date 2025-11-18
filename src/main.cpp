@@ -8,6 +8,7 @@
 #include "Camera.h"
 #include "Player.h"
 #include "Car.h"
+#include "AudioManager.h"
 
 #include <iostream>
 #include <vector>
@@ -18,6 +19,7 @@
 #include <gdiplus.h>
 #include <cmath>
 #include <set>
+#include <algorithm>
 #pragma comment(lib, "gdiplus.lib")
 
 // Settings
@@ -32,6 +34,9 @@ float lastFrame = 0.0f;
 bool keys[1024] = { false };
 bool keysProcessed[1024] = { false };
 
+// Audio manager (global for key callbacks)
+AudioManager* g_audioManager = nullptr;
+
 // Camera - อยู่ด้านหลังและสูงขึ้น
 Camera camera(glm::vec3(0.0f, 6.0f, 12.0f));
 
@@ -45,7 +50,7 @@ const float CAR_DESPAWN_DISTANCE = 80.0f; // Remove cars that are far behind
 // Function declarations
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
-void processInput(GLFWwindow* window, Player* player);
+void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager);
 unsigned int createGroundPlane();
 void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 projection);
 unsigned int loadTexture(const char* path);
@@ -88,6 +93,13 @@ int main()
 
     // OpenGL configuration
     glEnable(GL_DEPTH_TEST);
+
+    // Initialize audio system
+    AudioManager audioManager;
+    if (!audioManager.Initialize()) {
+        std::cerr << "Warning: Failed to initialize audio system" << std::endl;
+    }
+    g_audioManager = &audioManager;
 
     // Build and compile shaders
     Shader shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl");
@@ -193,6 +205,14 @@ int main()
         }
     }
     
+    // Start playing background music
+    std::string musicPath = "assets/Zambolino - Beautiful Day (freetouse.com).mp3";
+    if (!audioManager.PlayMusic(musicPath)) {
+        std::cerr << "Warning: Could not load music from " << musicPath << std::endl;
+        std::cerr << "Note: MP3 files are not supported. Please convert to WAV format." << std::endl;
+        std::cerr << "You can convert using: ffmpeg -i input.mp3 -acodec pcm_s16le -ar 44100 output.wav" << std::endl;
+    }
+    
     // Create multiple cars - กระจายตามเลน (Z axis) พร้อมการเว้นช่องห่าง
     for (int i = 0; i < 8; i++) {
         // Map i to lane indices in range roughly centered around 0. For NUM_LANES=10 this yields -5..4
@@ -246,6 +266,7 @@ int main()
     std::cout << "W/A/S/D - Move" << std::endl;
     std::cout << "SPACE - Jump" << std::endl;
     std::cout << "LEFT SHIFT - Speed Boost (5 sec)" << std::endl;
+    std::cout << "[ ] - Decrease/Increase Volume" << std::endl;
     std::cout << "ESC - Exit" << std::endl;
     std::cout << "Goal: Survive as long as possible!" << std::endl;
     std::cout << "======================" << std::endl;
@@ -259,7 +280,10 @@ int main()
         lastFrame = currentFrame;
 
         // Input
-        processInput(window, player);
+        processInput(window, player, &audioManager);
+
+        // Update audio system
+        audioManager.Update();
 
         // Update
         if (!gameOver) {
@@ -544,7 +568,7 @@ int main()
     return 0;
 }
 
-void processInput(GLFWwindow* window, Player* player)
+void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager)
 {
     if (gameOver) return;
 
@@ -583,6 +607,26 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    // Volume control with [ and ]
+    if (key == GLFW_KEY_LEFT_BRACKET && action == GLFW_PRESS) {
+        if (g_audioManager) {
+            ALfloat currentVolume;
+            alGetListenerf(AL_GAIN, &currentVolume);
+            currentVolume = (currentVolume - 0.1f < 0.0f) ? 0.0f : (currentVolume - 0.1f);
+            alListenerf(AL_GAIN, currentVolume);
+            std::cout << "Volume: " << static_cast<int>(currentVolume * 100) << "%" << std::endl;
+        }
+    }
+    if (key == GLFW_KEY_RIGHT_BRACKET && action == GLFW_PRESS) {
+        if (g_audioManager) {
+            ALfloat currentVolume;
+            alGetListenerf(AL_GAIN, &currentVolume);
+            currentVolume = (currentVolume + 0.1f > 1.0f) ? 1.0f : (currentVolume + 0.1f);
+            alListenerf(AL_GAIN, currentVolume);
+            std::cout << "Volume: " << static_cast<int>(currentVolume * 100) << "%" << std::endl;
+        }
+    }
 
     if (key >= 0 && key < 1024)
     {
