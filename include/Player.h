@@ -14,6 +14,7 @@ public:
     float gravity;
     bool hasSpeedBoost;
     float speedBoostTimer;
+    int potionCount;
     Model* model;
     bool useModel;
 
@@ -30,6 +31,7 @@ public:
         gravity = -15.0f;
         hasSpeedBoost = false;
         speedBoostTimer = 0.0f;
+        potionCount = 0;
         model = nullptr;
         useModel = false;
 
@@ -108,6 +110,19 @@ public:
     void ActivateSpeedBoost() {
         hasSpeedBoost = true;
         speedBoostTimer = 5.0f; // 5 seconds boost
+    }
+
+    void AddPotion() {
+        potionCount++;
+    }
+
+    bool UsePotion() {
+        if (potionCount > 0) {
+            potionCount--;
+            ActivateSpeedBoost();
+            return true;
+        }
+        return false;
     }
 
     void Draw() override {

@@ -59,7 +59,7 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
 unsigned int createGroundPlane();
 void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 projection);
 unsigned int loadTexture(const char* path);
-void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, std::vector<GameObject*>& tunnels, int& playerHearts, int& score);
+void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, std::set<int>& potionZonesUsed, std::vector<GameObject*>& potions, std::vector<GameObject*>& tunnels, int& playerHearts, int& score);
 
 int main()
 {
@@ -184,6 +184,15 @@ int main()
         }
     }
 
+    // Load potion model
+    Model* potionModel = new Model();
+    bool potionModelLoaded = potionModel->loadModel("assets/models/low_poly_potion.glb");
+    if (!potionModelLoaded) {
+        delete potionModel;
+        potionModel = nullptr;
+        std::cout << "Warning: Could not load potion model" << std::endl;
+    }
+
     // Load bridge model for car spawn hiding
     Model* tunnelModel = new Model();
     std::cout << "Attempting to load bridge model from: assets/bridge.glb" << std::endl;
@@ -239,6 +248,24 @@ int main()
         std::cout << "Spawning bridges at zone " << zoneIndex << " - Left: (-40, 1, " << z << "), Right: (40, 1, " << z << ")" << std::endl;
     };
 
+    // Track potion zones and potions
+    std::set<int> potionZonesUsed;
+    std::vector<GameObject*> potions; // GameObject per potion for collision and transform
+
+    auto spawnPotionInZone = [&](int zoneIndex) {
+        if (potionZonesUsed.count(zoneIndex)) return; // already used
+        potionZonesUsed.insert(zoneIndex);
+
+        float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+        GameObject* p = new GameObject();
+        // Spawn to the left side of heart, closer to center
+        p->position = glm::vec3(-8.0f, 2.5f, z);
+        p->scale = glm::vec3(0.5f, 0.5f, 0.5f);
+        p->rotation = glm::vec3(-90.0f, 0.0f, 0.0f); // Upright - no rotation
+        if (!potionModel) p->scale = glm::vec3(0.4f);
+        potions.push_back(p);
+    };
+
     // Spawn initial hearts for upcoming grass zones (a few ahead)
     int startZone = static_cast<int>(std::floor(-player->position.z / TEXTURE_ZONE_SIZE));
     std::cout << "Player start Z: " << player->position.z << ", startZone: " << startZone << std::endl;
@@ -258,11 +285,21 @@ int main()
     }
     std::cout << "Nearest lake zone: " << nearestLakeZone << std::endl;
 
+    bool firstGrassZone = true;
     for (int z = startZone; z <= startZone + 8; ++z) {
         int zoneMod = mod3(z);
         std::cout << "Zone " << z << ": mod3=" << zoneMod << std::endl;
         if (zoneMod == 0) { // grass zone
             spawnHeartInZone(z);
+            // Guarantee potion in first grass zone, then 33% chance for others
+            if (firstGrassZone) {
+                spawnPotionInZone(z);
+                firstGrassZone = false;
+                std::cout << "Spawned guaranteed potion in zone " << z << std::endl;
+            } else if (rand() % 3 == 0) { // 33% chance for subsequent zones
+                spawnPotionInZone(z);
+                std::cout << "Spawned random potion in zone " << z << std::endl;
+            }
         } else if (zoneMod == 2) { // street zone
             spawnTunnelInZone(z);
         }
@@ -353,7 +390,7 @@ int main()
 
         // Check for reset key when game is over
         if (gameOver && keys[GLFW_KEY_R]) {
-            resetGame(player, cars, heartZonesUsed, hearts, tunnels, playerHearts, score);
+            resetGame(player, cars, heartZonesUsed, hearts, potionZonesUsed, potions, tunnels, playerHearts, score);
         }
 
         // Update audio system
@@ -374,6 +411,10 @@ int main()
                 if (mod3(z) == 0 && heartZonesUsed.count(z) == 0) {
                     // small chance to spawn (so not every grass has one) - set to always spawn for now
                     spawnHeartInZone(z);
+                    // Randomly spawn potion in some grass zones
+                    if (rand() % 3 == 0 && potionZonesUsed.count(z) == 0) { // 33% chance
+                        spawnPotionInZone(z);
+                    }
                 }
             }
 
@@ -454,6 +495,24 @@ int main()
                     audioManager.PlaySoundEffect("assets/sound/retro-coin-4-236671.mp3");
                     delete hg;
                     hearts.erase(hearts.begin() + h);
+                }
+            }
+
+            // Update potions: check collection
+            for (int p = (int)potions.size() - 1; p >= 0; --p) {
+                GameObject* pg = potions[p];
+                // Bobbing animation for visibility
+                pg->position.y = 2.5f + sinf(static_cast<float>(glfwGetTime()) * 3.0f) * 0.3f;
+                // Spinning animation - rotate around X axis
+                pg->rotation.z = -90.0f + sinf(static_cast<float>(glfwGetTime()) * 4.0f) * 180.0f; // Spin 180 degrees per 1.57 seconds
+                // Check collision with player
+                if (player->CheckCollision(pg, 0.0f)) {
+                    player->AddPotion();
+                    std::cout << "Picked up a potion! Potions=" << player->potionCount << std::endl;
+                    // Play sound effect
+                    audioManager.PlaySoundEffect("assets/sound/energy-drink-effect-230559.mp3");
+                    delete pg;
+                    potions.erase(potions.begin() + p);
                 }
             }
 
@@ -667,6 +726,22 @@ int main()
             }
         }
 
+        // Render potions (power-up pickups)
+        for (auto p : potions) {
+            shader.setMat4("model", p->GetModelMatrix());
+            if (potionModel) {
+                // Force a purple/magenta color for the potion
+                shader.setVec3("objectColor", glm::vec3(1.0f, 0.0f, 1.0f));
+                shader.setBool("overrideColor", true);
+                potionModel->Draw();
+                shader.setBool("overrideColor", false);
+            } else {
+                // Fallback: draw a simple purple marker using GameObject's mesh
+                shader.setVec3("objectColor", glm::vec3(1.0f, 0.0f, 1.0f));
+                p->Draw();
+            }
+        }
+
         // Render bridges (hide car spawning on street zones)
         for (auto t : tunnels) {
             shader.setMat4("model", t->GetModelMatrix());
@@ -682,7 +757,8 @@ int main()
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         textRenderer->RenderText("Distance: " + std::to_string(score * 2) + "m", 20.0f, 30.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
-        textRenderer->RenderText("Lives: " + std::to_string(playerHearts), SCR_WIDTH - 200.0f, 30.0f, 1.0f, glm::vec3(1.0f, 0.3f, 0.3f), SCR_WIDTH, SCR_HEIGHT);
+        textRenderer->RenderText("Lives: " + std::to_string(playerHearts), SCR_WIDTH - 250.0f, 30.0f, 1.0f, glm::vec3(1.0f, 0.3f, 0.3f), SCR_WIDTH, SCR_HEIGHT);
+        textRenderer->RenderText("Potions: " + std::to_string(player->potionCount), SCR_WIDTH - 250.0f, 90.0f, 1.0f, glm::vec3(1.0f, 0.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
         glDisable(GL_BLEND);
 
         // Swap buffers and poll events
@@ -701,11 +777,16 @@ int main()
         delete hearts[i];
     }
     hearts.clear();
+    for (size_t i = 0; i < potions.size(); ++i) {
+        delete potions[i];
+    }
+    potions.clear();
     for (size_t i = 0; i < tunnels.size(); ++i) {
         delete tunnels[i];
     }
     tunnels.clear();
     if (heartModel) delete heartModel;
+    if (potionModel) delete potionModel;
     if (tunnelModel) delete tunnelModel;
     if (cubemap) delete cubemap;
     glDeleteVertexArrays(1, &groundVAO);
@@ -745,13 +826,17 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
         keysProcessed[GLFW_KEY_SPACE] = true;
     }
 
-    // Shift - Speed Boost
+    // Shift - Use Potion or Speed Boost
     if (keys[GLFW_KEY_LEFT_SHIFT] && !keysProcessed[GLFW_KEY_LEFT_SHIFT]) {
-        player->ActivateSpeedBoost();
+        bool usedPotion = player->UsePotion();
+        if (usedPotion) {
+            std::cout << "Potion used! Speed Boost Activated! (5 seconds) - Potions left: " << player->potionCount << std::endl;
+            // Play running sound effect
+            audioManager->PlaySoundEffect("assets/sound/running-on-the-floor-359909.mp3");
+        } else {
+            std::cout << "No potions! You need to collect potions first!" << std::endl;
+        }
         keysProcessed[GLFW_KEY_LEFT_SHIFT] = true;
-        std::cout << "Speed Boost Activated! (5 seconds)" << std::endl;
-        // Play running sound effect
-        audioManager->PlaySoundEffect("assets/sound/running-on-the-floor-359909.mp3");
     }
 }
 
@@ -964,7 +1049,7 @@ unsigned int loadTexture(const char* path)
     return textureID;
 }
 
-void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, std::vector<GameObject*>& tunnels, int& playerHearts, int& score)
+void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZonesUsed, std::vector<GameObject*>& hearts, std::set<int>& potionZonesUsed, std::vector<GameObject*>& potions, std::vector<GameObject*>& tunnels, int& playerHearts, int& score)
 {
     // Clean up old player
     if (player != nullptr) {
@@ -983,6 +1068,12 @@ void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZon
     }
     hearts.clear();
 
+    // Clean up old potions
+    for (size_t i = 0; i < potions.size(); ++i) {
+        delete potions[i];
+    }
+    potions.clear();
+
     // Clean up old tunnels
     for (size_t i = 0; i < tunnels.size(); ++i) {
         delete tunnels[i];
@@ -994,6 +1085,7 @@ void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZon
     playerHearts = 1;
     lastCarSpawnZ = 0.0f;
     heartZonesUsed.clear();
+    potionZonesUsed.clear();
 
     // Recreate player at starting position
     player = new Player(glm::vec3(0.0f, 0.5f, 15.0f));
@@ -1049,11 +1141,32 @@ void resetGame(Player*& player, std::vector<Car*>& cars, std::set<int>& heartZon
         tunnels.push_back(bridgeRight);
     };
 
+    auto spawnPotionInZone = [&](int zoneIndex) {
+        if (potionZonesUsed.count(zoneIndex)) return;
+        potionZonesUsed.insert(zoneIndex);
+
+        float z = - (zoneIndex * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+        GameObject* p = new GameObject();
+        // Spawn to the left side of heart, closer to center
+        p->position = glm::vec3(-8.0f, 2.5f, z);
+        p->scale = glm::vec3(0.5f, 0.5f, 0.5f);
+        p->rotation = glm::vec3(-90.0f, 0.0f, 0.0f); // Upright
+        potions.push_back(p);
+    };
+
     // Recreate hearts in starting zones
     int startZone = static_cast<int>(std::floor(-player->position.z / TEXTURE_ZONE_SIZE));
+    bool firstGrassZone = true;
     for (int z = startZone; z <= startZone + 8; ++z) {
         if (mod3(z) == 0) {
             spawnHeartInZone(z);
+            // Guarantee potion in first grass zone, then 33% chance for others
+            if (firstGrassZone) {
+                spawnPotionInZone(z);
+                firstGrassZone = false;
+            } else if (rand() % 3 == 0) { // 33% chance for subsequent zones
+                spawnPotionInZone(z);
+            }
         } else if (mod3(z) == 2) {
             spawnTunnelInZone(z);
         }
