@@ -455,48 +455,62 @@ int main()
             }
 
             // Spawn new cars as player moves forward
-            if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
-                lastCarSpawnZ = player->position.z;
-                
-                // Spawn 2-3 new cars at different lanes (reduced from 3-5)
-                int numNewCars = 2 + (rand() % 2); // 2-3 cars
-                for (int i = 0; i < numNewCars; ++i) {
-                    int lane = (i % NUM_LANES) - (NUM_LANES / 2); // support even-numbered lanes
-                    bool movingRight = (rand() % 2 == 0);
-                    Car* newCar = new Car(lane, LANE_WIDTH, movingRight);
-                    
-                    // Spawn further ahead to avoid pop-in
-                    if (movingRight) {
-                        newCar->position.x = -50.0f + (i * 15.0f);
-                    } else {
-                        newCar->position.x = 50.0f - (i * 15.0f);
-                    }
-                    // Place spawn in a street zone ahead of the player to ensure cars only appear on streets
-                        int extraZones = 2 + (rand() % 3); // 2..4 zones ahead for variety
+            // Spawn new cars as player moves forward
+if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
+    lastCarSpawnZ = player->position.z;
+    
+    // Spawn 2-3 new cars at different lanes
+    int numNewCars = 2 + (rand() % 2);
+    
+    // สร้าง vector เก็บ lane ที่ยังไม่ได้ใช้ในรอบนี้
+    std::vector<int> availableLanes;
+    for (int l = -NUM_LANES/2; l < NUM_LANES/2; l++) {
+        availableLanes.push_back(l);
+    }
+    
+    for (int i = 0; i < numNewCars && !availableLanes.empty(); ++i) {
+        // สุ่มเลือก lane จาก lanes ที่เหลือ
+        int laneIndex = rand() % availableLanes.size();
+        int lane = availableLanes[laneIndex];
+        availableLanes.erase(availableLanes.begin() + laneIndex);
+        
+        bool movingRight = (rand() % 2 == 0);
+        Car* newCar = new Car(lane, LANE_WIDTH, movingRight);
+        
+        // Spawn position based on direction
+        if (movingRight) {
+            newCar->position.x = -60.0f - (rand() % 40); // สุ่มตำแหน่ง X ด้วย
+        } else {
+            newCar->position.x = 60.0f + (rand() % 40);
+        }
+        
+        // สุ่ม zone ที่จะ spawn (2-4 zones ahead) แยกต่างหากสำหรับแต่ละรถ
+        int extraZones = 2 + (rand() % 3);
+        int targetZone = getNearestStreetZoneIndex(player->position.z, extraZones);
+        
+        // นับรถในโซนนั้น
+        int existingInZone = 0;
+        for (auto c : cars) {
+            int cz = static_cast<int>(std::floor(-c->position.z / TEXTURE_ZONE_SIZE));
+            if (cz == targetZone) existingInZone++;
+        }
 
-                        // Determine the target street zone index and cap cars per zone to avoid overcrowding
-                        int targetZone = getNearestStreetZoneIndex(player->position.z, extraZones);
-                        // Count existing cars in that zone
-                        int existingInZone = 0;
-                        for (auto c : cars) {
-                            int cz = static_cast<int>(std::floor(-c->position.z / TEXTURE_ZONE_SIZE));
-                            if (cz == targetZone) existingInZone++;
-                        }
+        const int MAX_CARS_PER_ZONE = NUM_LANES * 2;
+        if (existingInZone >= MAX_CARS_PER_ZONE) {
+            delete newCar;
+            continue;
+        }
 
-                        const int MAX_CARS_PER_ZONE = NUM_LANES * 2; // allow up to 2 cars per lane
-                        if (existingInZone >= MAX_CARS_PER_ZONE) {
-                            delete newCar; // skip spawn if zone full
-                            continue;
-                        }
+        // วาง Z position โดยใช้ zone center + สุ่ม offset เล็กน้อย
+        float zoneCenter = - (targetZone * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f);
+        float randomOffset = (rand() % 20 - 10) * 0.5f; // สุ่ม ±5 units
+        newCar->position.z = zoneCenter + randomOffset; // ไม่บวก lane * LANE_WIDTH ตรงนี้!
+        newCar->position.y = 0.3f + (lane * 0.1f);
 
-                        // Place new car in the chosen street zone but offset by lane so each lane gets cars
-                        newCar->position.z = - (targetZone * TEXTURE_ZONE_SIZE + TEXTURE_ZONE_SIZE * 0.5f) + lane * LANE_WIDTH;
-                        newCar->position.y = 0.3f + (lane * 0.1f);
-
-                        cars.push_back(newCar);
-                }
-                std::cout << "New cars spawned! Total cars: " << cars.size() << std::endl;
-            }
+        cars.push_back(newCar);
+    }
+    std::cout << "New cars spawned! Total cars: " << cars.size() << std::endl;
+}
 
             // Update hearts: check collection first
             for (int h = (int)hearts.size() - 1; h >= 0; --h) {
