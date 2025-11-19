@@ -10,7 +10,6 @@ file(GLOB_RECURSE SOURCES
     "external/glad/src/glad.c"
 )
 
-# Add header files
 file(GLOB_RECURSE HEADERS 
     "include/*.h"
 )
@@ -21,22 +20,21 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 target_include_directories(${PROJECT_NAME} PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/external/glad/include
-    C:/Users/mayma/Documents/year3/game/vcpkg/installed/x64-windows/include
 )
 
 # Find OpenGL
 find_package(OpenGL REQUIRED)
 
-# Find packages (if using vcpkg, these will be found automatically)
+# Libraries from vcpkg
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(OpenAL CONFIG REQUIRED)
 find_package(SndFile CONFIG REQUIRED)
-find_package(Freetype REQUIRED)
+find_package(Freetype CONFIG REQUIRED)
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} 
+target_link_libraries(${PROJECT_NAME}
     OpenGL::GL
     glfw
     glm::glm
@@ -46,13 +44,16 @@ target_link_libraries(${PROJECT_NAME}
     Freetype::Freetype
 )
 
-# Copy shaders and assets to build directory
+# Copy shaders folder
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
 )
 
+# Copy assets folder
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
+    ${CMAKE_SOURCE_DIR}/assets
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
 )

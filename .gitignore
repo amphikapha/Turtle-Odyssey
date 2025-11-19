@@ -40,3 +40,5 @@ external/*/
 
 # Logs
 *.log
+
+.env

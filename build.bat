@@ -3,15 +3,34 @@ echo ================================
 echo Building Turtle Odyssey
 echo ================================
 
+REM Load .env file
+if exist "..\.env" (
+    for /f "usebackq tokens=1,2 delims==" %%a in ("..\ .env") do (
+        set %%a=%%b
+    )
+)
+
+REM Check if variable exists
+if "%VCPKG_TOOLCHAIN%"=="" (
+    echo ERROR: VCPKG_TOOLCHAIN not set in .env
+    echo Create .env with:
+    echo VCPKG_TOOLCHAIN=C:/Users/ananz/vcpkg/scripts/buildsystems/vcpkg.cmake
+    pause
+    exit /b 1
+)
+
+echo Using vcpkg toolchain:
+echo %VCPKG_TOOLCHAIN%
+
 REM Create build directory
 if not exist build mkdir build
 cd build
 
-REM Generate project files
 echo.
 echo Generating project files...
 echo Note: Using vcpkg toolchain
-cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/Users/mayma/Documents/year3/game/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+cmake .. -DCMAKE_TOOLCHAIN_FILE=%VCPKG_TOOLCHAIN%
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -19,16 +38,13 @@ if %ERRORLEVEL% NEQ 0 (
     echo.
     echo If you see "Could not find package" errors, you need to:
     echo 1. Install vcpkg
-    echo 2. Install libraries: vcpkg install glfw3:x64-windows glm:x64-windows assimp:x64-windows
+    echo 2. Install required libs:
+    echo    vcpkg install glfw3:x64-windows glm:x64-windows assimp:x64-windows openal-soft:x64-windows libsndfile:x64-windows freetype:x64-windows
     echo 3. Run: vcpkg integrate install
-    echo.
-    echo Or specify vcpkg toolchain manually:
-    echo cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake
     pause
     exit /b 1
 )
 
-REM Build the project
 echo.
 echo Building project...
 cmake --build . --config Release
@@ -44,11 +60,5 @@ echo.
 echo ================================
 echo Build successful!
 echo ================================
-echo.
 echo Executable location: build\Release\TurtleOdyssey.exe
-echo.
-echo To run the game:
-echo   cd build\Release
-echo   TurtleOdyssey.exe
-echo.
 pause
