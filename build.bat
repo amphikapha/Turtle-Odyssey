@@ -4,8 +4,8 @@ echo Building Turtle Odyssey
 echo ================================
 
 REM Load .env file
-if exist "..\.env" (
-    for /f "usebackq tokens=1,2 delims==" %%a in ("..\ .env") do (
+if exist ".env" (
+    for /f "usebackq tokens=1,2 delims==" %%a in (".env") do (
         set %%a=%%b
     )
 )
