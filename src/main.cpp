@@ -45,9 +45,18 @@ Model* g_tunnelModel = nullptr;
 // Camera - อยู่ด้านหลังและสูงขึ้น
 Camera camera(glm::vec3(0.0f, 6.0f, 12.0f));
 
+// Game state enum
+enum GameState {
+    MENU,
+    PLAYING,
+    GAME_OVER
+};
+
 // Game state
-bool gameOver = false;
+GameState gameState = MENU;
+bool gameOver = false; // Keep for backwards compatibility
 int score = 0;
+int highScore = 0;
 float lastCarSpawnZ = 0.0f; // Track Z position where we last spawned cars
 const float CAR_SPAWN_INTERVAL = 15.0f; // Spawn new cars every 15 units forward
 const float CAR_DESPAWN_DISTANCE = 80.0f; // Remove cars that are far behind
@@ -59,11 +68,20 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
 unsigned int createGroundPlane();
 void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 projection);
 unsigned int loadTexture(const char* path);
+void loadHighScore();
+void saveHighScore();
+void resetGame(Player* player, std::vector<Car*>& cars, std::vector<GameObject*>& hearts,
+               std::vector<GameObject*>& potions, std::vector<GameObject*>& tunnels,
+               std::vector<GameObject*>& bridgeColliders, std::set<int>& heartZonesUsed,
+               std::set<int>& potionZonesUsed, int& playerHearts);
 
 int main()
 {
     // Initialize random seed
     srand(static_cast<unsigned>(time(0)));
+
+    // Load high score from file
+    loadHighScore();
 
     // Initialize GDI+
     using namespace Gdiplus;
@@ -405,6 +423,20 @@ int main()
         // Save last safe player position BEFORE applying input movement
         glm::vec3 lastSafePos = player->position;
 
+        // Check for restart (R key) when game is over
+        if (gameState == GAME_OVER && keys[GLFW_KEY_R] && !keysProcessed[GLFW_KEY_R]) {
+            keysProcessed[GLFW_KEY_R] = true;
+            resetGame(player, cars, hearts, potions, tunnels, bridgeColliders,
+                     heartZonesUsed, potionZonesUsed, playerHearts);
+            gameState = PLAYING;
+            gameOver = false;
+            score = 0;
+            lastCarSpawnZ = 0.0f;
+            camera.FollowTarget(player->position);
+            glfwSetWindowTitle(window, "Turtle Odyssey");
+            std::cout << "Game restarted!" << std::endl;
+        }
+
         // Input
         processInput(window, player, &audioManager);
 
@@ -412,7 +444,7 @@ int main()
         audioManager.Update();
 
         // Update
-        if (!gameOver) {
+        if (gameState == PLAYING && !gameOver) {
             // Apply physics (e.g., gravity/jump) after input
             player->Update(deltaTime);
 
@@ -564,9 +596,15 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
                 
                 if (playerInWater) {
                     gameOver = true;
+                    gameState = GAME_OVER;
+                    if (score > highScore) {
+                        highScore = score;
+                        saveHighScore();
+                    }
                     std::cout << "\n=== You fell into the water! ===" << std::endl;
                     std::cout << "Final Distance: " << score * 2 << " meters" << std::endl;
-                    std::cout << "Press ESC to exit or R to restart" << std::endl;
+                    std::cout << "High Score: " << highScore * 2 << " meters" << std::endl;
+                    std::cout << "Press R to restart" << std::endl;
                     std::string titleStr = "GAME OVER | Distance: " + std::to_string(score * 2) + "m";
                     glfwSetWindowTitle(window, titleStr.c_str());
                     // Play water splash sound effect
@@ -599,10 +637,16 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
                     
                     if (playerHearts <= 0) {
                         gameOver = true;
+                        gameState = GAME_OVER;
+                        if (score > highScore) {
+                            highScore = score;
+                            saveHighScore();
+                        }
                         std::cout << "\n=== GAME OVER ===" << std::endl;
                         std::cout << "You got hit by a car!" << std::endl;
-                        std::cout << "Final Score: " << score << " meters" << std::endl;
-                        std::cout << "Press ESC to exit or R to restart" << std::endl;
+                        std::cout << "Final Distance: " << score * 2 << " meters" << std::endl;
+                        std::cout << "High Score: " << highScore * 2 << " meters" << std::endl;
+                        std::cout << "Press R to restart" << std::endl;
                         std::string titleStr = "GAME OVER | Distance: " + std::to_string(score * 2) + "m";
                         glfwSetWindowTitle(window, titleStr.c_str());
                     }
@@ -801,12 +845,51 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
 
         // Bridges are now rendered as ground texture in lake zones instead of separate objects
 
-        // Draw HUD text on screen
+        // Draw HUD text on screen based on game state
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        textRenderer->RenderText("Distance: " + std::to_string(score * 2) + "m", 20.0f, 30.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
-        textRenderer->RenderText("Lives: " + std::to_string(playerHearts), SCR_WIDTH - 250.0f, 30.0f, 1.0f, glm::vec3(1.0f, 0.3f, 0.3f), SCR_WIDTH, SCR_HEIGHT);
-        textRenderer->RenderText("Potions: " + std::to_string(player->potionCount), SCR_WIDTH - 250.0f, 90.0f, 1.0f, glm::vec3(1.0f, 0.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+
+        if (gameState == MENU) {
+            // Start menu screen
+            textRenderer->RenderText("TURTLE ODYSSEY", SCR_WIDTH / 2 - 300.0f, 150.0f, 2.0f, glm::vec3(0.2f, 1.0f, 0.4f), SCR_WIDTH, SCR_HEIGHT);
+            textRenderer->RenderText("Press SPACE to Start", SCR_WIDTH / 2 - 200.0f, 280.0f, 1.2f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+
+            float yOffset = 370.0f;
+            textRenderer->RenderText("=== CONTROLS ===", SCR_WIDTH / 2 - 180.0f, yOffset, 1.0f, glm::vec3(1.0f, 1.0f, 0.5f), SCR_WIDTH, SCR_HEIGHT);
+            yOffset += 60.0f;
+            textRenderer->RenderText("W/A/S/D - Move", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
+            yOffset += 45.0f;
+            textRenderer->RenderText("SPACE - Jump", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
+            yOffset += 45.0f;
+            textRenderer->RenderText("LEFT SHIFT - Speed Boost (5 sec)", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
+            yOffset += 45.0f;
+            textRenderer->RenderText("[ ] - Volume Down/Up", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
+            yOffset += 45.0f;
+            textRenderer->RenderText("ESC - Exit Game", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
+
+            if (highScore > 0) {
+                textRenderer->RenderText("High Score: " + std::to_string(highScore * 2) + "m", SCR_WIDTH / 2 - 180.0f, SCR_HEIGHT - 100.0f, 1.2f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
+            }
+        } else if (gameState == PLAYING) {
+            // In-game HUD
+            textRenderer->RenderText("Distance: " + std::to_string(score * 2) + "m", 20.0f, 30.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+            textRenderer->RenderText("Lives: " + std::to_string(playerHearts), SCR_WIDTH - 250.0f, 30.0f, 1.0f, glm::vec3(1.0f, 0.3f, 0.3f), SCR_WIDTH, SCR_HEIGHT);
+            textRenderer->RenderText("Potions: " + std::to_string(player->potionCount), SCR_WIDTH - 250.0f, 90.0f, 1.0f, glm::vec3(1.0f, 0.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+        } else if (gameState == GAME_OVER) {
+            // Game over screen
+            textRenderer->RenderText("GAME OVER", SCR_WIDTH / 2 - 250.0f, 200.0f, 2.5f, glm::vec3(1.0f, 0.2f, 0.2f), SCR_WIDTH, SCR_HEIGHT);
+            textRenderer->RenderText("Distance: " + std::to_string(score * 2) + "m", SCR_WIDTH / 2 - 200.0f, 330.0f, 1.5f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+
+            if (score >= highScore) {
+                textRenderer->RenderText("NEW HIGH SCORE!", SCR_WIDTH / 2 - 220.0f, 400.0f, 1.3f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
+            } else {
+                textRenderer->RenderText("High Score: " + std::to_string(highScore * 2) + "m", SCR_WIDTH / 2 - 220.0f, 400.0f, 1.3f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
+            }
+
+            textRenderer->RenderText("Press R to Restart", SCR_WIDTH / 2 - 200.0f, 500.0f, 1.2f, glm::vec3(0.7f, 1.0f, 0.7f), SCR_WIDTH, SCR_HEIGHT);
+            textRenderer->RenderText("Press ESC to Exit", SCR_WIDTH / 2 - 180.0f, 560.0f, 1.0f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
+        }
+
         glDisable(GL_BLEND);
 
         // Swap buffers and poll events
@@ -853,7 +936,16 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
 
 void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager)
 {
-    if (gameOver) return;
+    // Handle SPACE key to start game from menu
+    if (gameState == MENU && keys[GLFW_KEY_SPACE] && !keysProcessed[GLFW_KEY_SPACE]) {
+        gameState = PLAYING;
+        keysProcessed[GLFW_KEY_SPACE] = true;
+        std::cout << "Game started!" << std::endl;
+        return;
+    }
+
+    // Don't process game controls if not playing
+    if (gameState != PLAYING || gameOver) return;
 
     glm::vec3 movement(0.0f);
 
@@ -896,6 +988,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    // R key to restart game (handled in main loop through global variables)
+    // The actual reset logic will be in the main loop
 
     // Volume control with [ and ]
     if (key == GLFW_KEY_LEFT_BRACKET && action == GLFW_PRESS) {
@@ -1093,4 +1188,81 @@ unsigned int loadTexture(const char* path)
     std::cout << "Successfully loaded texture: " << path << " (" << width << "x" << height << ")" << std::endl;
 
     return textureID;
+}
+
+void loadHighScore()
+{
+    std::ifstream file("highscore.txt");
+    if (file.is_open()) {
+        file >> highScore;
+        file.close();
+        std::cout << "Loaded high score: " << highScore * 2 << "m" << std::endl;
+    } else {
+        highScore = 0;
+        std::cout << "No high score file found, starting fresh!" << std::endl;
+    }
+}
+
+void saveHighScore()
+{
+    std::ofstream file("highscore.txt");
+    if (file.is_open()) {
+        file << highScore;
+        file.close();
+        std::cout << "Saved new high score: " << highScore * 2 << "m" << std::endl;
+    } else {
+        std::cerr << "Failed to save high score!" << std::endl;
+    }
+}
+
+void resetGame(Player* player, std::vector<Car*>& cars, std::vector<GameObject*>& hearts,
+               std::vector<GameObject*>& potions, std::vector<GameObject*>& tunnels,
+               std::vector<GameObject*>& bridgeColliders, std::set<int>& heartZonesUsed,
+               std::set<int>& potionZonesUsed, int& playerHearts)
+{
+    // Reset player
+    player->position = glm::vec3(0.0f, 3.5f, 15.0f);
+    player->isJumping = false;
+    player->jumpVelocity = 0.0f;
+    player->hasSpeedBoost = false;
+    player->speedBoostTimer = 0.0f;
+    player->potionCount = 0;
+
+    // Reset player hearts
+    playerHearts = 1;
+
+    // Clear all cars
+    for (auto car : cars) {
+        delete car;
+    }
+    cars.clear();
+
+    // Clear all hearts
+    for (auto heart : hearts) {
+        delete heart;
+    }
+    hearts.clear();
+    heartZonesUsed.clear();
+
+    // Clear all potions
+    for (auto potion : potions) {
+        delete potion;
+    }
+    potions.clear();
+    potionZonesUsed.clear();
+
+    // Clear all tunnels
+    for (auto tunnel : tunnels) {
+        delete tunnel;
+    }
+    tunnels.clear();
+
+    // Clear all bridge colliders
+    for (auto collider : bridgeColliders) {
+        delete collider;
+    }
+    bridgeColliders.clear();
+
+    // Note: The game will respawn these objects in the main loop automatically
+    // based on player position, so we don't need to manually respawn them here
 }
