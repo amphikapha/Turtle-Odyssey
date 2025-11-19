@@ -16,10 +16,6 @@ out/
 *.so
 *.dylib
 
-# Object files
-*.o
-*.obj
-
 # Libraries
 *.lib
 *.a
