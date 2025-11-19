@@ -206,6 +206,8 @@ int main()
 
     // Tunnels to hide car spawning (left and right sides)
     std::vector<GameObject*> tunnels;
+    // Invisible colliders that match tunnel (bridge) positions to prevent walking through them
+    std::vector<GameObject*> bridgeColliders;
 
     // One heart per grass zone: track which grass zones already had a heart spawned or consumed
     std::set<int> heartZonesUsed;
@@ -244,6 +246,22 @@ int main()
         bridgeRight->rotation = glm::vec3(90.0f, 180.0f, 90.0f);  // X=90 to stand up, Y=180 to flip right-side up, Z=90 to face forward
         tunnels.push_back(bridgeRight);
         
+        // Create invisible blocking colliders along the left/right bridges to prevent the player walking through
+        // Approximate each bridge with a tall/thick box spanning this zone in Z.
+        // Only X and Z are used by CheckCollision, so Y scale is irrelevant visually.
+        const float colliderHalfWidth = 20.0f; // Half-thickness for blocking volume (wider to cover visible mesh)
+        const float colliderFullZ = TEXTURE_ZONE_SIZE*5; // Span one zone along Z
+
+        GameObject* leftCollider = new GameObject();
+        leftCollider->position = glm::vec3(-40.0f, 0.0f, z);
+        leftCollider->scale = glm::vec3(colliderHalfWidth * 2.0f, 1.0f, colliderFullZ);
+        bridgeColliders.push_back(leftCollider);
+
+        GameObject* rightCollider = new GameObject();
+        rightCollider->position = glm::vec3(40.0f, 0.0f, z);
+        rightCollider->scale = glm::vec3(colliderHalfWidth * 2.0f, 1.0f, colliderFullZ);
+        bridgeColliders.push_back(rightCollider);
+
         std::cout << "Spawning bridges at zone " << zoneIndex << " - Left: (-40, 1, " << z << "), Right: (40, 1, " << z << ")" << std::endl;
     };
 
@@ -384,6 +402,9 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+        // Save last safe player position BEFORE applying input movement
+        glm::vec3 lastSafePos = player->position;
+
         // Input
         processInput(window, player, &audioManager);
 
@@ -392,6 +413,7 @@ int main()
 
         // Update
         if (!gameOver) {
+            // Apply physics (e.g., gravity/jump) after input
             player->Update(deltaTime);
 
             // Update ground texture zone based on player position
@@ -538,6 +560,16 @@ int main()
                 }
             }
 
+            // Prevent walking through bridge/tunnel models by blocking on collision with invisible colliders
+            bool collidedWithBridge = false;
+            for (auto bc : bridgeColliders) {
+                if (player->CheckCollision(bc)) { collidedWithBridge = true; break; }
+            }
+            if (collidedWithBridge) {
+                // Revert to last safe position if collision detected
+                player->position = lastSafePos;
+            }
+
             // Update cars and remove ones that are too far behind
             // Use reverse iterator to safely remove elements
             for (int i = (int)cars.size() - 1; i >= 0; --i) {
@@ -589,6 +621,14 @@ int main()
                 if (tunnels[i]->position.z > player->position.z + CAR_DESPAWN_DISTANCE) {
                     delete tunnels[i];
                     tunnels.erase(tunnels.begin() + i);
+                }
+            }
+
+            // Remove bridge colliders that are too far behind
+            for (int i = (int)bridgeColliders.size() - 1; i >= 0; --i) {
+                if (bridgeColliders[i]->position.z > player->position.z + CAR_DESPAWN_DISTANCE) {
+                    delete bridgeColliders[i];
+                    bridgeColliders.erase(bridgeColliders.begin() + i);
                 }
             }
 
@@ -779,6 +819,10 @@ int main()
         delete tunnels[i];
     }
     tunnels.clear();
+    for (size_t i = 0; i < bridgeColliders.size(); ++i) {
+        delete bridgeColliders[i];
+    }
+    bridgeColliders.clear();
     if (heartModel) delete heartModel;
     if (potionModel) delete potionModel;
     if (tunnelModel) delete tunnelModel;

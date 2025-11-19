@@ -38,3 +38,4 @@ external/*/
 *.log
 
 .env
+Agents.md
