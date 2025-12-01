@@ -68,6 +68,7 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
 unsigned int createGroundPlane();
 void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 projection);
 unsigned int loadTexture(const char* path);
+unsigned int createUIQuad();
 void loadHighScore();
 void saveHighScore();
 void resetGame(Player* player, std::vector<Car*>& cars, std::vector<GameObject*>& hearts,
@@ -124,8 +125,15 @@ int main()
     }
     g_audioManager = &audioManager;
 
+    // Set initial audio volume to 60%
+    ALfloat initVolume = 0.6f;
+    alListenerf(AL_GAIN, initVolume);
+    std::cout << "Initial audio volume set to " << static_cast<int>(initVolume * 100) << "%" << std::endl;
+
     // Build and compile shaders
     Shader shader("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl");
+    // UI shader for drawing fullscreen UI textures (simple texture blit)
+    Shader uiShader("shaders/ui_vertex.glsl", "shaders/ui_fragment.glsl");
 
     // Load cubemap for skybox
     Cubemap* cubemap = new Cubemap();
@@ -412,6 +420,19 @@ int main()
     std::cout << "Goal: Survive as long as possible!" << std::endl;
     std::cout << "======================" << std::endl;
 
+    // Load UI backgrounds (menu and game over)
+    unsigned int menuTexture = loadTexture("assets/ui/menu_bg.png");
+    unsigned int gameoverTexture = loadTexture("assets/ui/gameover_bg.png");
+    unsigned int uiVAO = createUIQuad();
+    // Ensure UI textures don't repeat and fit the screen exactly
+    glBindTexture(GL_TEXTURE_2D, menuTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, gameoverTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // restore binding
+    glBindTexture(GL_TEXTURE_2D, 0);
     // Game loop
     while (!glfwWindowShouldClose(window))
     {
@@ -846,29 +867,41 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
         // Bridges are now rendered as ground texture in lake zones instead of separate objects
 
         // Draw HUD text on screen based on game state
+        // Render UI background images (menu / game over) as fullscreen quads first
+        glDisable(GL_DEPTH_TEST);
+        uiShader.use();
+        // Enable alpha blending for UI textures (menu/gameover may have alpha)
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glm::mat4 uiProjection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+        glm::mat4 uiView = glm::mat4(1.0f);
+        glm::mat4 uiModel = glm::mat4(1.0f);
+        uiShader.setMat4("projection", uiProjection);
+        uiShader.setMat4("view", uiView);
+        uiShader.setMat4("model", uiModel);
+        uiShader.setInt("uiTexture", 0);
+        glActiveTexture(GL_TEXTURE0);
+        // Draw menu background
+        if (gameState == MENU) {
+            glBindTexture(GL_TEXTURE_2D, menuTexture);
+            glBindVertexArray(uiVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
+        }
+        // Draw game over background
+        if (gameState == GAME_OVER) {
+            glBindTexture(GL_TEXTURE_2D, gameoverTexture);
+            glBindVertexArray(uiVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
+        }
+        // Restore depth test for world rendering below
+        glEnable(GL_DEPTH_TEST);
 
         if (gameState == MENU) {
-            // Start menu screen
-            textRenderer->RenderText("TURTLE ODYSSEY", SCR_WIDTH / 2 - 300.0f, 150.0f, 2.0f, glm::vec3(0.2f, 1.0f, 0.4f), SCR_WIDTH, SCR_HEIGHT);
-            textRenderer->RenderText("Press SPACE to Start", SCR_WIDTH / 2 - 200.0f, 280.0f, 1.2f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
-
-            float yOffset = 370.0f;
-            textRenderer->RenderText("=== CONTROLS ===", SCR_WIDTH / 2 - 180.0f, yOffset, 1.0f, glm::vec3(1.0f, 1.0f, 0.5f), SCR_WIDTH, SCR_HEIGHT);
-            yOffset += 60.0f;
-            textRenderer->RenderText("W/A/S/D - Move", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
-            yOffset += 45.0f;
-            textRenderer->RenderText("SPACE - Jump", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
-            yOffset += 45.0f;
-            textRenderer->RenderText("LEFT SHIFT - Speed Boost (5 sec)", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
-            yOffset += 45.0f;
-            textRenderer->RenderText("[ ] - Volume Down/Up", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
-            yOffset += 45.0f;
-            textRenderer->RenderText("ESC - Exit Game", 200.0f, yOffset, 0.8f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
-
+            // Start menu: only show small high score top-left (user requested only the score)
             if (highScore > 0) {
-                textRenderer->RenderText("High Score: " + std::to_string(highScore * 2) + "m", SCR_WIDTH / 2 - 180.0f, SCR_HEIGHT - 100.0f, 1.2f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
+                textRenderer->RenderText("High Score: " + std::to_string(highScore * 2) + "m", 20.0f, 30.0f, 0.9f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
             }
         } else if (gameState == PLAYING) {
             // In-game HUD
@@ -876,18 +909,12 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
             textRenderer->RenderText("Lives: " + std::to_string(playerHearts), SCR_WIDTH - 250.0f, 30.0f, 1.0f, glm::vec3(1.0f, 0.3f, 0.3f), SCR_WIDTH, SCR_HEIGHT);
             textRenderer->RenderText("Potions: " + std::to_string(player->potionCount), SCR_WIDTH - 250.0f, 90.0f, 1.0f, glm::vec3(1.0f, 0.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
         } else if (gameState == GAME_OVER) {
-            // Game over screen
-            textRenderer->RenderText("GAME OVER", SCR_WIDTH / 2 - 250.0f, 200.0f, 2.5f, glm::vec3(1.0f, 0.2f, 0.2f), SCR_WIDTH, SCR_HEIGHT);
-            textRenderer->RenderText("Distance: " + std::to_string(score * 2) + "m", SCR_WIDTH / 2 - 200.0f, 330.0f, 1.5f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+            // Game over screen - only render dynamic scores (distance and high-score)
+            std::string distanceStr = std::to_string(score * 2) + "m";
+            textRenderer->RenderText(distanceStr, SCR_WIDTH / 2 - 100.0f, 260.0f, 2.2f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
 
-            if (score >= highScore) {
-                textRenderer->RenderText("NEW HIGH SCORE!", SCR_WIDTH / 2 - 220.0f, 400.0f, 1.3f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
-            } else {
-                textRenderer->RenderText("High Score: " + std::to_string(highScore * 2) + "m", SCR_WIDTH / 2 - 220.0f, 400.0f, 1.3f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
-            }
-
-            textRenderer->RenderText("Press R to Restart", SCR_WIDTH / 2 - 200.0f, 500.0f, 1.2f, glm::vec3(0.7f, 1.0f, 0.7f), SCR_WIDTH, SCR_HEIGHT);
-            textRenderer->RenderText("Press ESC to Exit", SCR_WIDTH / 2 - 180.0f, 560.0f, 1.0f, glm::vec3(0.9f, 0.9f, 0.9f), SCR_WIDTH, SCR_HEIGHT);
+            std::string hsStr = "High Score: " + std::to_string(highScore * 2) + "m";
+            textRenderer->RenderText(hsStr, SCR_WIDTH / 2 - 140.0f, 340.0f, 1.2f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
         }
 
         glDisable(GL_BLEND);
@@ -926,6 +953,10 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
     if (cubemap) delete cubemap;
     glDeleteVertexArrays(1, &groundVAO);
     glDeleteTextures(3, groundTextures);
+    // UI textures and quad
+    glDeleteTextures(1, &menuTexture);
+    glDeleteTextures(1, &gameoverTexture);
+    glDeleteVertexArrays(1, &uiVAO);
 
     // Shutdown GDI+
     Gdiplus::GdiplusShutdown(gdiplusToken);
@@ -1083,6 +1114,42 @@ void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 pr
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+}
+
+unsigned int createUIQuad()
+{
+    unsigned int VBO, VAO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    // Quad covers pixel coords [0..SCR_WIDTH] x [0..SCR_HEIGHT]
+    float vertices[] = {
+        // positions (x,y,z)        texcoords
+        // Note: texcoords V flipped to account for image origin differences (GDI+ top-left)
+        0.0f, 0.0f, 0.0f,            0.0f, 1.0f,
+        (float)SCR_WIDTH, 0.0f, 0.0f, 1.0f, 1.0f,
+        (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, 1.0f, 0.0f,
+
+        (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, 1.0f, 0.0f,
+        0.0f, (float)SCR_HEIGHT, 0.0f,            0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f,            0.0f, 1.0f
+    };
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // texcoord attribute (location 2 in existing shaders)
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    return VAO;
 }
 
 unsigned int loadTexture(const char* path)
