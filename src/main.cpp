@@ -630,7 +630,7 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
             // Prevent walking through bridge/tunnel models by blocking on collision with invisible colliders
             bool collidedWithBridge = false;
             for (auto bc : bridgeColliders) {
-                if (player->CheckCollision(bc)) { collidedWithBridge = true; break; }
+                if (player->CheckCollision(bc, 2.0f)) { collidedWithBridge = true; break; }
             }
             if (collidedWithBridge) {
                 // Revert to last safe position if collision detected
