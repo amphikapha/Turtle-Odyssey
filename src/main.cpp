@@ -68,6 +68,7 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
 unsigned int createGroundPlane();
 void renderGround(unsigned int VAO, Shader* shader, glm::mat4 view, glm::mat4 projection);
 unsigned int loadTexture(const char* path);
+unsigned int loadUITexture(const char* path); // Load texture resized to screen size
 unsigned int createUIQuad();
 void loadHighScore();
 void saveHighScore();
@@ -420,17 +421,10 @@ int main()
     std::cout << "Goal: Survive as long as possible!" << std::endl;
     std::cout << "======================" << std::endl;
 
-    // Load UI backgrounds (menu and game over)
-    unsigned int menuTexture = loadTexture("assets/ui/menu_bg.png");
-    unsigned int gameoverTexture = loadTexture("assets/ui/gameover_bg.png");
+    // Load UI backgrounds (menu and game over) - use loadUITexture to resize to screen
+    unsigned int menuTexture = loadUITexture("assets/ui/menu_bg.png");
+    unsigned int gameoverTexture = loadUITexture("assets/ui/gameover_bg.png");
     unsigned int uiVAO = createUIQuad();
-    // Ensure UI textures don't repeat and fit the screen exactly
-    glBindTexture(GL_TEXTURE_2D, menuTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_2D, gameoverTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     // restore binding
     glBindTexture(GL_TEXTURE_2D, 0);
     // Game loop
@@ -1123,28 +1117,34 @@ unsigned int createUIQuad()
     glGenBuffers(1, &VBO);
 
     // Quad covers pixel coords [0..SCR_WIDTH] x [0..SCR_HEIGHT]
+    // Texture coordinates span full 0-1 range to show the entire image scaled to fit screen
+    float w = (float)SCR_WIDTH;
+    float h = (float)SCR_HEIGHT;
+    
+    std::cout << "Creating UI Quad: " << w << "x" << h << std::endl;
+    
     float vertices[] = {
-        // positions (x,y,z)        texcoords
-        // Note: texcoords V flipped to account for image origin differences (GDI+ top-left)
-        0.0f, 0.0f, 0.0f,            0.0f, 1.0f,
-        (float)SCR_WIDTH, 0.0f, 0.0f, 1.0f, 1.0f,
-        (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, 1.0f, 0.0f,
-
-        (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, 1.0f, 0.0f,
-        0.0f, (float)SCR_HEIGHT, 0.0f,            0.0f, 0.0f,
-        0.0f, 0.0f, 0.0f,            0.0f, 1.0f
+        // positions (x,y,z)    texcoords (u,v)
+        // Triangle 1
+        0.0f, 0.0f, 0.0f,       0.0f, 1.0f,  // bottom-left  (tex: top-left)
+        w,    0.0f, 0.0f,       1.0f, 1.0f,  // bottom-right (tex: top-right)
+        w,    h,    0.0f,       1.0f, 0.0f,  // top-right    (tex: bottom-right)
+        // Triangle 2
+        w,    h,    0.0f,       1.0f, 0.0f,  // top-right    (tex: bottom-right)
+        0.0f, h,    0.0f,       0.0f, 0.0f,  // top-left     (tex: bottom-left)
+        0.0f, 0.0f, 0.0f,       0.0f, 1.0f   // bottom-left  (tex: top-left)
     };
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // position attribute
+    // position attribute (location 0)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    // texcoord attribute (location 2 in existing shaders)
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
+    // texcoord attribute (location 1 to match ui_vertex.glsl)
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -1253,6 +1253,99 @@ unsigned int loadTexture(const char* path)
     delete image;
 
     std::cout << "Successfully loaded texture: " << path << " (" << width << "x" << height << ")" << std::endl;
+
+    return textureID;
+}
+
+// Load UI texture - resize to screen size for proper display
+unsigned int loadUITexture(const char* path)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    using namespace Gdiplus;
+    
+    // Convert char* to wchar_t*
+    int len = strlen(path);
+    wchar_t* widePath = new wchar_t[len + 1];
+    mbstowcs(widePath, path, len + 1);
+    
+    Image* image = new Image(widePath);
+    delete[] widePath;
+    
+    if (image->GetLastStatus() != Ok || image->GetWidth() == 0 || image->GetHeight() == 0) {
+        std::cout << "Warning: Failed to load UI image: " << path << std::endl;
+        delete image;
+        
+        // Create fallback magenta texture
+        unsigned char* data = new unsigned char[SCR_WIDTH * SCR_HEIGHT * 4];
+        for (unsigned int i = 0; i < SCR_WIDTH * SCR_HEIGHT * 4; i += 4) {
+            data[i] = 255; data[i + 1] = 0; data[i + 2] = 255; data[i + 3] = 255;
+        }
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        delete[] data;
+        return textureID;
+    }
+    
+    UINT origWidth = image->GetWidth();
+    UINT origHeight = image->GetHeight();
+    
+    std::cout << "Loading UI texture: " << path << " (original: " << origWidth << "x" << origHeight << ")" << std::endl;
+    
+    // Create a bitmap resized to screen dimensions
+    Bitmap* resizedBitmap = new Bitmap(SCR_WIDTH, SCR_HEIGHT, PixelFormat32bppARGB);
+    Graphics* graphics = Graphics::FromImage(resizedBitmap);
+    
+    // High quality scaling
+    graphics->SetInterpolationMode(InterpolationModeHighQualityBicubic);
+    graphics->SetSmoothingMode(SmoothingModeHighQuality);
+    
+    // Draw the original image scaled to fit the screen
+    graphics->DrawImage(image, 0, 0, (INT)SCR_WIDTH, (INT)SCR_HEIGHT);
+    delete graphics;
+    delete image;
+
+    // Lock bitmap bits for reading
+    BitmapData bitmapData;
+    Rect rect(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    resizedBitmap->LockBits(&rect, ImageLockModeRead, PixelFormat32bppARGB, &bitmapData);
+
+    unsigned char* pixels = static_cast<unsigned char*>(bitmapData.Scan0);
+    unsigned char* textureData = new unsigned char[SCR_WIDTH * SCR_HEIGHT * 4];
+
+    // Convert BGRA -> RGBA
+    for (UINT y = 0; y < SCR_HEIGHT; ++y) {
+        for (UINT x = 0; x < SCR_WIDTH; ++x) {
+            int src_idx = (y * bitmapData.Stride) + (x * 4);
+            int dst_idx = (y * SCR_WIDTH + x) * 4;
+            textureData[dst_idx + 0] = pixels[src_idx + 2]; // R
+            textureData[dst_idx + 1] = pixels[src_idx + 1]; // G
+            textureData[dst_idx + 2] = pixels[src_idx + 0]; // B
+            textureData[dst_idx + 3] = pixels[src_idx + 3]; // A
+        }
+    }
+
+    resizedBitmap->UnlockBits(&bitmapData);
+
+    // Upload to OpenGL
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, textureData);
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    delete[] textureData;
+    delete resizedBitmap;
+
+    std::cout << "Successfully loaded UI texture: " << path << " (resized to: " << SCR_WIDTH << "x" << SCR_HEIGHT << ")" << std::endl;
 
     return textureID;
 }
