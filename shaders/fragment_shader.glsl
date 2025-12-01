@@ -62,21 +62,21 @@ void main()
             vec4 waterCol = texture(groundTex[idx], TexCoords);
             finalColor = waterCol.rgb;
             
-            // Create zigzag bridge pattern
-            float bridgeWidth = 6.0; // Narrower bridge for more challenge
+            // Create gentle zigzag bridge pattern
+            float bridgeWidth = 8.0; // Slightly narrower bridge
             
-            // Calculate which segment of the bridge we're in (each segment is ~8 units long)
-            float segmentLength = 8.0;
+            // Calculate which segment of the bridge we're in
+            float segmentLength = 12.0; // Medium segments - balanced turns
             float zInZone = mod(-FragPos.z, textureZoneSize); // Position within the zone (0 to zoneSize)
             int segmentIndex = int(floor(zInZone / segmentLength));
             float segmentProgress = mod(zInZone, segmentLength) / segmentLength; // 0 to 1 within segment
             
             // Zigzag pattern: alternate left and right offsets
             // Use zone floor to seed the pattern so each lake zone has different zigzag
-            float zoneOffset = mod(zoneFloor * 3.7, 10.0) - 5.0; // Random-ish offset per zone (-5 to 5)
+            float zoneOffset = mod(zoneFloor * 2.3, 6.0) - 3.0; // Smaller random offset per zone (-3 to 3)
             
             // Calculate bridge center X position based on zigzag pattern
-            float amplitude = 12.0; // How far left/right the bridge goes
+            float amplitude = 10.0; // Medium amplitude zigzag
             float bridgeCenterX;
             
             // Create zigzag by alternating between left and right positions
