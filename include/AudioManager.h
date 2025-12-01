@@ -33,6 +33,15 @@ public:
     // Play a sound effect (one-shot, doesn't loop)
     void PlaySoundEffect(const std::string& filePath);
 
+    // Play walking sound (loops while walking)
+    void PlayWalkingSound(const std::string& filePath);
+
+    // Stop walking sound
+    void StopWalkingSound();
+
+    // Check if walking sound is playing
+    bool IsWalkingSoundPlaying();
+
 private:
     // OpenAL objects
     ALCdevice* device;
@@ -43,6 +52,12 @@ private:
     // Sound effect sources (for non-looping sounds)
     ALuint effectSources[4];  // Up to 4 simultaneous sound effects
     ALuint effectBuffers[4];
+
+    // Walking sound source (looping)
+    ALuint walkingSource;
+    ALuint walkingBuffer;
+    bool walkingSoundLoaded;
+    std::string currentWalkingPath;
 
     // Audio data
     std::string currentMusicPath;

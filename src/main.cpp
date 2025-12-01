@@ -932,7 +932,7 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
         } else if (gameState == GAME_OVER) {
             // Game over screen - only render dynamic scores (distance and high-score)
             std::string distanceStr = "Your Score: " + std::to_string(score * 2) + " m";
-            textRenderer->RenderText(distanceStr, SCR_WIDTH / 2 - 240.0f, 210.0f, 1.3f, glm::vec3(0.0f, 0.5f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
+            textRenderer->RenderText(distanceStr, SCR_WIDTH / 2 - 260.0f, 210.0f, 1.3f, glm::vec3(0.0f, 0.5f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
 
             std::string hsStr = "Best Score: " + std::to_string(highScore * 2) + " m";
             textRenderer->RenderText(hsStr, SCR_WIDTH / 2- 160.0f, 300.0f, 0.8f, glm::vec3(0.0f, 0.0f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
@@ -1014,6 +1014,14 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
     if (glm::length(movement) > 0.0f) {
         movement = glm::normalize(movement);
         player->Move(movement, deltaTime);
+        
+        // Play walking sound if not using speed boost (running)
+        if (!player->hasSpeedBoost && !player->isJumping) {
+            audioManager->PlayWalkingSound("assets/sound/walking-soundscape-200112.mp3");
+        }
+    } else {
+        // Stop walking sound when not moving
+        audioManager->StopWalkingSound();
     }
 
     // Space - Jump
@@ -1027,7 +1035,8 @@ void processInput(GLFWwindow* window, Player* player, AudioManager* audioManager
         bool usedPotion = player->UsePotion();
         if (usedPotion) {
             std::cout << "Potion used! Speed Boost Activated! (5 seconds) - Potions left: " << player->potionCount << std::endl;
-            // Play running sound effect
+            // Stop walking sound and play running sound effect
+            audioManager->StopWalkingSound();
             audioManager->PlaySoundEffect("assets/sound/running-on-the-floor-359909.mp3");
         } else {
             std::cout << "No potions! You need to collect potions first!" << std::endl;

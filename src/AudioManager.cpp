@@ -3,7 +3,8 @@
 
 AudioManager::AudioManager() 
     : device(nullptr), context(nullptr), sourceId(0), bufferId(0), 
-      musicLoaded(false), isPlaying(false) 
+      musicLoaded(false), isPlaying(false),
+      walkingSource(0), walkingBuffer(0), walkingSoundLoaded(false)
 {
     for (int i = 0; i < 4; ++i) {
         effectSources[i] = 0;
@@ -14,6 +15,7 @@ AudioManager::AudioManager()
 AudioManager::~AudioManager() 
 {
     StopMusic();
+    StopWalkingSound();
     
     // Clean up OpenAL
     if (sourceId != 0) {
@@ -21,6 +23,14 @@ AudioManager::~AudioManager()
     }
     if (bufferId != 0) {
         alDeleteBuffers(1, &bufferId);
+    }
+    
+    // Clean up walking sound
+    if (walkingSource != 0) {
+        alDeleteSources(1, &walkingSource);
+    }
+    if (walkingBuffer != 0) {
+        alDeleteBuffers(1, &walkingBuffer);
     }
     
     // Clean up sound effect sources and buffers
@@ -94,6 +104,16 @@ bool AudioManager::Initialize()
             alSource3f(effectSources[i], AL_VELOCITY, 0.0f, 0.0f, 0.0f);
             alSourcei(effectSources[i], AL_LOOPING, AL_FALSE);
         }
+    }
+
+    // Generate walking sound source (loops)
+    alGenSources(1, &walkingSource);
+    if (walkingSource != 0) {
+        alSourcef(walkingSource, AL_PITCH, 1.0f);
+        alSourcef(walkingSource, AL_GAIN, 100.0f);  // Higher volume for walking sound to be heard over music
+        alSource3f(walkingSource, AL_POSITION, 0.0f, 0.0f, 0.0f);
+        alSource3f(walkingSource, AL_VELOCITY, 0.0f, 0.0f, 0.0f);
+        alSourcei(walkingSource, AL_LOOPING, AL_TRUE);  // Loop walking sound
     }
 
     // Set source properties
@@ -319,3 +339,78 @@ void AudioManager::PlaySoundEffect(const std::string& filePath)
 
     std::cout << "Playing sound effect: " << filePath << std::endl;
 }
+
+void AudioManager::PlayWalkingSound(const std::string& filePath)
+{
+    if (device == nullptr || walkingSource == 0) {
+        std::cerr << "Audio system not initialized for walking sound" << std::endl;
+        return;
+    }
+
+    // Check if already playing the same sound
+    if (walkingSoundLoaded && currentWalkingPath == filePath) {
+        ALint state;
+        alGetSourcei(walkingSource, AL_SOURCE_STATE, &state);
+        if (state == AL_PLAYING) {
+            return;  // Already playing, don't restart
+        }
+        // Same sound but stopped, just replay
+        alSourcePlay(walkingSource);
+        return;
+    }
+
+    // Stop current walking sound if any
+    StopWalkingSound();
+
+    // Delete old buffer if exists
+    if (walkingBuffer != 0) {
+        alDeleteBuffers(1, &walkingBuffer);
+        walkingBuffer = 0;
+    }
+
+    // Create new buffer
+    alGenBuffers(1, &walkingBuffer);
+    ALenum genError = alGetError();
+    if (genError != AL_NO_ERROR) {
+        std::cerr << "Error generating walking buffer: " << genError << std::endl;
+        return;
+    }
+
+    // Load audio file
+    if (!LoadAudioFile(filePath, walkingBuffer)) {
+        alDeleteBuffers(1, &walkingBuffer);
+        walkingBuffer = 0;
+        return;
+    }
+
+    // Attach buffer to source and play
+    alSourcei(walkingSource, AL_BUFFER, walkingBuffer);
+    alSourcePlay(walkingSource);
+
+    ALenum playError = alGetError();
+    if (playError != AL_NO_ERROR) {
+        std::cerr << "Error playing walking sound: " << playError << std::endl;
+        return;
+    }
+
+    currentWalkingPath = filePath;
+    walkingSoundLoaded = true;
+    std::cout << "Playing walking sound: " << filePath << std::endl;
+}
+
+void AudioManager::StopWalkingSound()
+{
+    if (walkingSource != 0) {
+        alSourceStop(walkingSource);
+    }
+}
+
+bool AudioManager::IsWalkingSoundPlaying()
+{
+    if (walkingSource == 0) return false;
+
+    ALint state;
+    alGetSourcei(walkingSource, AL_SOURCE_STATE, &state);
+    return (state == AL_PLAYING);
+}
+

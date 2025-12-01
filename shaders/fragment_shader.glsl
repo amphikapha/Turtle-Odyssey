@@ -96,11 +96,14 @@ void main()
             float distFromBridgeCenter = abs(FragPos.x - bridgeCenterX);
             
             if (distFromBridgeCenter < bridgeWidth * 0.5) {
-                // On the bridge - sample bridge texture
-                vec4 bridgeCol = texture(bridgeTexture, TexCoords);
+                // On the bridge - use dark brown wood color instead of texture
+                vec3 darkBrownWood = vec3(0.4, 0.25, 0.1); // Dark brown wood color
+                // Add some wood grain variation based on position
+                float grain = sin(FragPos.z * 2.0) * 0.05 + sin(FragPos.x * 3.0) * 0.03;
+                vec3 bridgeColor = darkBrownWood + vec3(grain, grain * 0.5, 0.0);
                 // Add slight edge darkening for visual depth
                 float edgeFactor = 1.0 - (distFromBridgeCenter / (bridgeWidth * 0.5)) * 0.3;
-                finalColor = mix(waterCol.rgb, bridgeCol.rgb * edgeFactor, 0.85);
+                finalColor = mix(waterCol.rgb, bridgeColor * edgeFactor, 0.95);
             }
         } else {
             // Sample the normal ground textures
