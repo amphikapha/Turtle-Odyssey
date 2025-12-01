@@ -1,276 +1,232 @@
 # 🐢 Turtle Odyssey
-**Chill 3D Turtle Crossing Game**
 
-เกมแนว 3D Casual/Reflex ที่คุณจะได้สวมบทเป็นเต่านักเดินทางที่พยายามข้ามถนนอันวุ่นวาย!
+**A Chill 3D Endless Runner Game**
 
-![Game Features](https://img.shields.io/badge/3D-OpenGL-green) ![Models](https://img.shields.io/badge/Models-FBX-blue) ![Language](https://img.shields.io/badge/Language-C++17-orange)
-
-## 🚀 เริ่มต้นอย่างรวดเร็ว
-
-### วิธีที่ 1: ใช้ Setup Script (แนะนำ!)
-
-```powershell
-# 1. ติดตั้ง dependencies อัตโนมัติ (ครั้งแรกครั้งเดียว)
-.\setup_dependencies.bat
-
-# 2. Build เกม
-.\build.bat
-
-# 3. รันเกม
-.\run.bat
-```
-
-### วิธีที่ 2: ติดตั้ง Manual
-
-ดูคำแนะนำแบบละเอียดใน **[BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md)**
+![Game Features](https://img.shields.io/badge/3D-OpenGL%203.3-green) ![Models](https://img.shields.io/badge/Models-FBX-blue) ![Language](https://img.shields.io/badge/Language-C++17-orange) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
 
 ---
 
-### Controls:
-- **W/A/S/D** - เคลื่อนที่เต่า
-- **Space** - กระโดด
-- **ESC** - ออกจากเกม
+## 🎮 About The Game
+
+**Turtle Odyssey** is a 3D Endless Runner game where you play as a little adventurous turtle! Dodge retro cars on the road, cross bridges, jump over rivers, collect power-up items, and try to run as far as you can!
+
+This game is developed using **OpenGL 3.3** and **C++17**.
+
+### ✨ Game Features
+
+- 🐢 **3D Turtle Character** - Move freely in all directions
+- 🚗 **Retro-Style Cars** - Vehicles moving at random speeds
+- 🌉 **Bridges and Tunnels** - Diverse terrain and environments
+- 🌊 **Rivers** - Jump across without falling into the water!
+- 👹 **Goblin Enemies** - Watch out and dodge them!
+- 💊 **Speed Boost Potion** - Temporary speed increase
+- ❤️ **Heart Pickups** - Collect to gain extra lives
+- 🎵 **Music and Sound Effects** - Immersive audio experience
+- 🏆 **High Score System** - Compete with yourself!
+- 🌅 **Beautiful Skybox** - Pure sky atmosphere
+- 📷 **Third-Person Camera** - Camera follows the player
 
 ---
 
-## 🎮 การเล่น
+## 🖼️ Screenshots
 
-### Controls:
+<!-- Add screenshots here -->
+<!-- Example: -->
+<!-- ![Gameplay Screenshot 1](screenshots/gameplay1.png) -->
+<!-- ![Gameplay Screenshot 2](screenshots/gameplay2.png) -->
+<!-- ![Menu Screenshot](screenshots/menu.png) -->
 
-### ขั้นตอนที่ 1: ติดตั้ง Dependencies
+**[Add Screenshots Here]**
 
-คุณต้องมี Libraries เหล่านี้:
+---
 
-1. **GLFW** - สำหรับจัดการ window และ input
-2. **GLAD** - สำหรับโหลด OpenGL functions
-3. **GLM** - สำหรับคณิตศาสตร์ 3D
-4. **CMake** - สำหรับ build โปรเจ็กต์
+## 🎬 Gameplay Video
 
-#### วิธีติดตั้งบน Windows:
+<!-- Add 30-second video here -->
+<!-- For YouTube use: -->
+<!-- [![Turtle Odyssey Gameplay](https://img.youtube.com/vi/VIDEO_ID/0.jpg)](https://www.youtube.com/watch?v=VIDEO_ID) -->
 
-**ตัวเลือก 1: ใช้ vcpkg (แนะนำ)**
+**[Add Embedded Video Here]**
+
+---
+
+## 🕹️ Play Now!
+
+🎮 **Play the game at:** [**https://amphikapha.itch.io/turtle-odyssey**](https://amphikapha.itch.io/turtle-odyssey)
+
+---
+
+## 🎮 Controls
+
+| Key | Action |
+|-----|--------|
+| **W** | Move Forward |
+| **S** | Move Backward |
+| **A** | Move Left |
+| **D** | Move Right |
+| **Space** | Jump |
+| **[** | Decrease Volume |
+| **]** | Increase Volume |
+| **ESC** | Exit Game |
+
+---
+
+## 🚀 Quick Start (For Developers)
+
+### Prerequisites:
+- **Visual Studio 2019/2022** with C++ workload
+- **CMake 3.20+**
+- **vcpkg**
+
+### Step 1: Install vcpkg and Dependencies
+
 ```powershell
-# ติดตั้ง vcpkg (ถ้ายังไม่มี)
+# Clone vcpkg (if not installed)
 git clone https://github.com/Microsoft/vcpkg.git
 cd vcpkg
 .\bootstrap-vcpkg.bat
 
-# ติดตั้ง libraries
-.\vcpkg install glfw3:x64-windows
-.\vcpkg install glm:x64-windows
+# Install required libraries
+.\vcpkg install glfw3:x64-windows glm:x64-windows assimp:x64-windows openal-soft:x64-windows libsndfile:x64-windows freetype:x64-windows
+
+# Integrate vcpkg with Visual Studio
 .\vcpkg integrate install
 ```
 
-**ตัวเลือก 2: ดาวน์โหลดแบบ Manual**
-- GLFW: https://www.glfw.org/download.html
-- GLM: https://github.com/g-truc/glm/releases
-- วาง libraries ไว้ใน folder `external/`
+### Step 2: Create `.env` File
 
-### ขั้นตอนที่ 2: ติดตั้ง GLAD
+Create a `.env` file in the project root directory with your vcpkg toolchain path:
 
-1. ไปที่ https://glad.dav1d.de/
-2. เลือก:
-   - Language: C/C++
-   - Specification: OpenGL
-   - Profile: Core
-   - Version: 3.3 หรือสูงกว่า
-3. กด Generate
-4. ดาวน์โหลดและแตกไฟล์
-5. คัดลอก `include/glad/` และ `include/KHR/` ไปยัง `external/glad/include/`
-6. คัดลอก `src/glad.c` ไปยัง `external/glad/src/`
-
-### โครงสร้าง External folder ที่ถูกต้อง:
 ```
-Turtle-Odyssey/
-├── external/
-│   ├── glad/
-│   │   ├── include/
-│   │   │   ├── glad/
-│   │   │   └── KHR/
-│   │   └── src/
-│   │       └── glad.c
-│   ├── glfw/
-│   │   ├── include/
-│   │   └── lib/
-│   └── glm/
-│       └── glm/
-├── src/
-├── include/
-├── shaders/
-└── assets/
+VCPKG_TOOLCHAIN=C:/path/to/your/vcpkg/scripts/buildsystems/vcpkg.cmake
 ```
 
-### ขั้นตอนที่ 3: แก้ไข CMakeLists.txt
+> **Example:** If vcpkg is installed at `C:\vcpkg`, then:
+> ```
+> VCPKG_TOOLCHAIN=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+> ```
 
-เปิดไฟล์ `CMakeLists.txt` และแก้ path ของ libraries ให้ตรงกับระบบของคุณ:
+You can also copy from `.env.example` and modify the path.
 
-```cmake
-# ถ้าใช้ vcpkg ไม่ต้องแก้อะไร vcpkg จะจัดการให้
-
-# ถ้าติดตั้งแบบ manual ให้เพิ่ม:
-target_include_directories(${PROJECT_NAME} PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/glfw/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/glm
-    # ... etc
-)
-
-target_link_libraries(${PROJECT_NAME} 
-    OpenGL::GL
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/glfw/lib/glfw3.lib
-)
-```
-
-### ขั้นตอนที่ 4: เพิ่ม glad.c ใน CMakeLists.txt
-
-แก้ไข CMakeLists.txt:
-```cmake
-# Add source files
-file(GLOB_RECURSE SOURCES 
-    "src/*.cpp"
-    "external/glad/src/glad.c"  # เพิ่มบรรทัดนี้
-)
-```
-
-### ขั้นตอนที่ 5: Build Project
+### Step 3: Build and Run
 
 ```powershell
-# สร้าง build folder
-mkdir build
-cd build
+# Build the game
+.\build.bat
 
-# Generate project files
-cmake ..
-
-# Build โปรเจ็กต์
-cmake --build . --config Release
-
-# หรือเปิด .sln file ใน Visual Studio และกด Build
+# Run the game
+.\run.bat
 ```
 
-### ขั้นตอนที่ 6: รันเกม
+---
 
-```powershell
-# ใน build/Release/ หรือ build/Debug/
-.\TurtleOdyssey.exe
-```
-
-## 📁 โครงสร้างโปรเจ็กต์
+## 📁 Project Structure
 
 ```
 Turtle-Odyssey/
 ├── CMakeLists.txt          # Build configuration
-├── README.md               # คำแนะนำนี้
+├── README.md               # This file
 ├── src/
-│   └── main.cpp            # Main game loop
+│   ├── main.cpp            # Main game loop
+│   └── AudioManager.cpp    # Audio system
 ├── include/
 │   ├── Shader.h            # Shader management
 │   ├── Camera.h            # Third-person camera
 │   ├── GameObject.h        # Base game object class
 │   ├── Player.h            # Player (turtle) class
-│   └── Car.h               # Car obstacle class
+│   ├── Car.h               # Car obstacle class
+│   ├── Model.h             # 3D model loader
+│   ├── AudioManager.h      # Audio management
+│   ├── HUD.h               # UI elements
+│   └── TextRenderer.h      # Text rendering
 ├── shaders/
-│   ├── vertex_shader.glsl  # Vertex shader
-│   └── fragment_shader.glsl # Fragment shader with lighting
-├── assets/                 # (ไว้สำหรับรูปภาพ/โมเดลในอนาคต)
-└── external/               # External libraries (สร้างเองตามขั้นตอนด้านบน)
+│   ├── vertex_shader.glsl
+│   ├── fragment_shader.glsl
+│   ├── skybox_vertex.glsl
+│   ├── skybox_fragment.glsl
+│   ├── ui_vertex.glsl
+│   ├── ui_fragment.glsl
+│   ├── text_vertex.glsl
+│   └── text_fragment.glsl
+├── assets/
+│   ├── models/             # 3D models
+│   ├── textures/           # Textures
+│   ├── sound/              # Audio files
+│   ├── cubemap/            # Skybox textures
+│   └── ui/                 # UI elements
+└── external/               # External libraries
 ```
 
-## 🎨 Assets ที่ต้องการ (ถ้าต้องการปรับปรุงภาพ)
+---
 
-ตอนนี้เกมใช้รูปทรงเรขาคณิตพื้นฐาน (cubes) แต่ถ้าต้องการให้สวยขึ้นสามารถเพิ่ม:
+## 🙏 Credits & Attribution
 
-### 3D Models (Optional):
-- **เต่า**: ไฟล์ .obj หรือ .fbx ของโมเดลเต่า
-- **รถยนต์**: โมเดลรถหลายๆ แบบ (sedan, truck, etc.)
+### 3D Models
 
-แหล่งโมเดลฟรี:
-- [Kenney Assets](https://kenney.nl/assets) - มีโมเดลฟรีเยอะมาก
-- [Quaternius](https://quaternius.com/) - โมเดล low-poly สวยๆ
-- [Sketchfab](https://sketchfab.com/) - หาโมเดลฟรีได้
+| Asset | Author | License | Source |
+|-------|--------|---------|--------|
+| **Retro American Car** | Elbolillansen | CC Attribution | [Sketchfab](https://sketchfab.com/3d-models/free-retro-american-car-cartoon-low-poly-920afc941ac44b6599e6191631e8979b) |
+| **Goblin** | thedmitrii77 | CC Attribution | [Sketchfab](https://sketchfab.com/3d-models/goblin-3d-model-free-fac5c9e785054b3790b7ade36121945a) |
+| **Heart Emoji** | JChanvfx | CC Attribution | [Sketchfab](https://sketchfab.com/3d-models/heart-emoji-ee06846511314b96981313971236e188) |
+| **Bridge** | shedmon | CC Attribution | [Sketchfab](https://sketchfab.com/3d-models/bridge-9328bbfc04a84202a6a97bd59408473a) |
+| **Low Poly Potion** | mareksson | CC Attribution | [Sketchfab](https://sketchfab.com/3d-models/low-poly-potion-5e4e8d9708f34032bd07a661f6742d2a) |
 
-### Textures (Optional):
-- พื้นถนน (asphalt texture)
-- ผิวหญ้า (grass texture)
-- Sky box
+### Music & Sound Effects
 
-แหล่ง textures:
-- [Textures.com](https://www.textures.com/)
-- [OpenGameArt](https://opengameart.org/)
+| Asset | Author | Source |
+|-------|--------|--------|
+| **Beautiful Day** (Background Music) | Zambolino | [FreeTouse.com](https://freetouse.com/music/zambolino/beautiful-day) |
+| **Retro Coin** (Collect Sound) | Pixabay | [Pixabay](https://pixabay.com/sound-effects/retro-coin-4-236671/) |
+| **Car Crash** | Pixabay | [Pixabay](https://pixabay.com/sound-effects/car-crash-sound-376882/) |
+| **Water Splash** | Pixabay | [Pixabay](https://pixabay.com/sound-effects/water-splash-199583/) |
+| **Running Sound** | Pixabay | [Pixabay](https://pixabay.com/sound-effects/running-on-the-floor-359909/) |
+| **Walking Sound** | Pixabay | [Pixabay](https://pixabay.com/sound-effects/walking-soundscape-200112/) |
+| **Energy Drink Effect** | Pixabay | [Pixabay](https://pixabay.com/sound-effects/energy-drink-effect-230559/) |
 
-## 🔧 การปรับแต่งเกม
+### Environment & Skybox
 
-### เพิ่มความเร็วรถ:
-แก้ในไฟล์ `include/Car.h` บรรทัด ~25:
-```cpp
-velocity.z = 5.0f + (rand() % 3); // เปลี่ยนเลขนี้
-```
+| Asset | Author | Source |
+|-------|--------|--------|
+| **Syferfontein Pure Sky HDRI** | Poly Haven | [Poly Haven](https://polyhaven.com/a/syferfontein_1d_clear_puresky) |
+| **Panorama to Cubemap Converter** | jaxry | [GitHub](https://jaxry.github.io/panorama-to-cubemap/) |
 
-### เพิ่มจำนวนรถ:
-แก้ในไฟล์ `src/main.cpp` บรรทัด ~90:
-```cpp
-for (int i = 0; i < 8; i++) { // เปลี่ยน 8 เป็นจำนวนที่ต้องการ
-```
+### Libraries & Frameworks
 
-### ปรับความเร็วเต่า:
-แก้ในไฟล์ `include/Player.h` บรรทัด ~15:
-```cpp
-moveSpeed = 3.0f; // เปลี่ยนเลขนี้
-```
+- **OpenGL 3.3** - Graphics rendering
+- **GLFW** - Window management and input
+- **GLM** - Mathematics library
+- **Assimp** - 3D model loading
+- **OpenAL Soft** - Audio playback
+- **FreeType** - Text rendering
+- **stb_image** - Image loading
 
-## 🎯 Features ที่มีในเกม
-
-✅ เต่า 3D ที่เคลื่อนไหวได้  
-✅ รถยนต์วิ่งผ่านด้วยความเร็วสุ่ม  
-✅ Collision detection  
-✅ Third-person camera ติดตามผู้เล่น  
-✅ ระบบกระโดด  
-✅ ระบบคะแนน  
-✅ Basic lighting (Phong shading)  
-
-## 🚀 Features ที่จะเพิ่มในอนาคต
-
-- 🌊 ด่านแม่น้ำพร้อมไม้ลอย
-- 💊 ไอเท็มยาเพิ่มความเร็ว (Speed Boost)
-- 🎵 เสียงเพลงและ sound effects
-- 🏆 ระบบด่านและความยากที่เพิ่มขึ้น
-- 📱 Menu และ UI
-- 🌅 สภาพแวดล้อมที่หลากหลาย (กลางวัน/กลางคืน)
+---
 
 ## ⚠️ Troubleshooting
 
 ### Error: "Cannot find GLFW"
-- ตรวจสอบว่าติดตั้ง GLFW แล้ว
-- ตรวจสอบ path ใน CMakeLists.txt
+- Make sure GLFW is installed via vcpkg
+- Run `vcpkg integrate install`
 
 ### Error: "glad/glad.h not found"
-- ตรวจสอบว่าดาวน์โหลด GLAD มาแล้ว
-- วางไฟล์ใน `external/glad/include/`
+- Make sure the file is in `external/glad/include/`
 
-### จอดำ/ไม่มีอะไรแสดง:
-- ตรวจสอบว่า shaders อยู่ใน folder `shaders/` ถูกต้อง
-- ดูใน console มี error อะไรไหม
+### Black screen / Nothing displays
+- Check that shaders are in the `shaders/` folder correctly
+- Check the console for any error messages
 
-### เกมช้า:
-- ลดจำนวนรถ
-- ลด resolution ของหน้าต่าง
-
-### การตรวจจับการชน (Collision sensitivity)
-- ถ้ารู้สึกว่าเต่าต้องจมเข้าไปกว่าจะถือว่าชน สามารถปรับความ "ไว" ของการชนได้โดยแก้ค่า margin ในการเรียก `CheckCollision` (ไฟล์ `src/main.cpp`).
-- ปรับค่าในบรรทัดที่เช็กการชนเป็นค่าน้อยลงหรือมากขึ้น เช่น `player->CheckCollision(cars[i], 0.6f)` — ค่ายิ่งบวกมากการชนจะตรวจจับก่อน (ไวขึ้น)
-
-## 📝 License
-
-โปรเจ็กต์นี้สร้างเพื่อการศึกษา ใช้ได้ฟรี!
-
-## 🙏 Credits
-
-- OpenGL for graphics
-- GLFW for window management
-- GLM for mathematics
-- ไอเดียจากเกม Frogger คลาสสิก
+### No sound
+- Make sure audio files are in `assets/sound/`
+- Verify that OpenAL is installed correctly
 
 ---
 
-**Happy Coding! 🐢💚**
+## 📝 License
 
-ถ้ามีปัญหาหรือคำถาม ลองดู error messages ใน console หรือ check โครงสร้าง folder อีกครั้ง!
+This project was created for educational purposes in the Game Engine with OpenGL course [2110584.68 (2025/1)].
+
+3D models, music, and sound effects are used under their respective Creative Commons licenses. See the Attribution section above for details.
+
+---
+
+**Happy Gaming! 🐢💚**
