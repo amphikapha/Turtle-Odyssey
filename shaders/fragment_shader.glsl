@@ -62,19 +62,45 @@ void main()
             vec4 waterCol = texture(groundTex[idx], TexCoords);
             finalColor = waterCol.rgb;
             
-            // Overlay bridge texture in the center (where player walks)
-            // Bridge is about ±15 units wide in a 40-unit zone, so normalize X to [-20, 20] range
-            // Texture repeats based on world X position divided by zone size
-            float bridgeWidth = 16.0; // Width of the bridge stripe
-            float normalizedX = mod(FragPos.x, 40.0); // Repeat every 40 units (zone size)
-            if (normalizedX > 20.0) normalizedX -= 40.0; // Shift to [-20, 20] range
+            // Create zigzag bridge pattern
+            float bridgeWidth = 6.0; // Narrower bridge for more challenge
             
-            // Draw bridge in center: from -bridgeWidth/2 to +bridgeWidth/2
-            if (abs(normalizedX) < bridgeWidth * 0.5) {
-                // Sample bridge texture - use Y texture coord for bridge detail
+            // Calculate which segment of the bridge we're in (each segment is ~8 units long)
+            float segmentLength = 8.0;
+            float zInZone = mod(-FragPos.z, textureZoneSize); // Position within the zone (0 to zoneSize)
+            int segmentIndex = int(floor(zInZone / segmentLength));
+            float segmentProgress = mod(zInZone, segmentLength) / segmentLength; // 0 to 1 within segment
+            
+            // Zigzag pattern: alternate left and right offsets
+            // Use zone floor to seed the pattern so each lake zone has different zigzag
+            float zoneOffset = mod(zoneFloor * 3.7, 10.0) - 5.0; // Random-ish offset per zone (-5 to 5)
+            
+            // Calculate bridge center X position based on zigzag pattern
+            float amplitude = 12.0; // How far left/right the bridge goes
+            float bridgeCenterX;
+            
+            // Create zigzag by alternating between left and right positions
+            if (mod(float(segmentIndex), 2.0) < 0.5) {
+                // Moving from center-left to center-right
+                float startX = -amplitude * 0.5 + zoneOffset;
+                float endX = amplitude * 0.5 + zoneOffset;
+                bridgeCenterX = mix(startX, endX, segmentProgress);
+            } else {
+                // Moving from center-right to center-left
+                float startX = amplitude * 0.5 + zoneOffset;
+                float endX = -amplitude * 0.5 + zoneOffset;
+                bridgeCenterX = mix(startX, endX, segmentProgress);
+            }
+            
+            // Check if current X is on the bridge
+            float distFromBridgeCenter = abs(FragPos.x - bridgeCenterX);
+            
+            if (distFromBridgeCenter < bridgeWidth * 0.5) {
+                // On the bridge - sample bridge texture
                 vec4 bridgeCol = texture(bridgeTexture, TexCoords);
-                // Use bridge texture alpha or just overlay the color
-                finalColor = mix(waterCol.rgb, bridgeCol.rgb, 0.8); // 80% bridge color, 20% water shows through
+                // Add slight edge darkening for visual depth
+                float edgeFactor = 1.0 - (distFromBridgeCenter / (bridgeWidth * 0.5)) * 0.3;
+                finalColor = mix(waterCol.rgb, bridgeCol.rgb * edgeFactor, 0.85);
             }
         } else {
             // Sample the normal ground textures

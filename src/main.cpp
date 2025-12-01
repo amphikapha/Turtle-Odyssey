@@ -603,9 +603,37 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
 
             // If player is over water area but not jumping, they die
             if (mod3(playerBaseZone2) == 1) { // lake zone
-                // Check if player is far from center (where bridge is) - if so, in water
-                // Bridge width is 16 units in shader (±8 units from center), so safe range is ±8 units
-                if (fabsf(player->position.x) > 8.5f && !player->isJumping) { // Outside bridge area
+                // Calculate zigzag bridge position (must match shader logic!)
+                const float bridgeWidth = 6.0f; // Narrow bridge (same as shader)
+                const float segmentLength = 8.0f;
+                const float amplitude = 12.0f;
+                
+                // Calculate position within the zone
+                float zInZone = fmodf(-player->position.z, TEXTURE_ZONE_SIZE);
+                if (zInZone < 0) zInZone += TEXTURE_ZONE_SIZE;
+                int segmentIndex = static_cast<int>(std::floor(zInZone / segmentLength));
+                float segmentProgress = fmodf(zInZone, segmentLength) / segmentLength;
+                
+                // Zone offset for variety (must match shader)
+                float zoneOffset = fmodf(static_cast<float>(playerBaseZone2) * 3.7f, 10.0f) - 5.0f;
+                
+                // Calculate bridge center X based on zigzag
+                float bridgeCenterX;
+                if (segmentIndex % 2 == 0) {
+                    // Moving from left to right
+                    float startX = -amplitude * 0.5f + zoneOffset;
+                    float endX = amplitude * 0.5f + zoneOffset;
+                    bridgeCenterX = startX + (endX - startX) * segmentProgress;
+                } else {
+                    // Moving from right to left
+                    float startX = amplitude * 0.5f + zoneOffset;
+                    float endX = -amplitude * 0.5f + zoneOffset;
+                    bridgeCenterX = startX + (endX - startX) * segmentProgress;
+                }
+                
+                // Check if player is on the bridge
+                float distFromBridge = fabsf(player->position.x - bridgeCenterX);
+                if (distFromBridge > bridgeWidth * 0.5f && !player->isJumping) {
                     playerInWater = true;
                 }
                 
