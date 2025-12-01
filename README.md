@@ -30,23 +30,19 @@ This game is developed using **OpenGL 3.3** and **C++17**.
 
 ## 🖼️ Screenshots
 
-<!-- Add screenshots here -->
-<!-- Example: -->
-<!-- ![Gameplay Screenshot 1](screenshots/gameplay1.png) -->
-<!-- ![Gameplay Screenshot 2](screenshots/gameplay2.png) -->
-<!-- ![Menu Screenshot](screenshots/menu.png) -->
+<img width="1282" height="759" alt="Screenshot 2025-12-01 211440" src="https://github.com/user-attachments/assets/bce48bbd-be7a-4b84-a828-eea7fa21baa8" />
 
-**[Add Screenshots Here]**
+<img width="1282" height="759" alt="Screenshot 2025-12-01 211457" src="https://github.com/user-attachments/assets/057fed6c-ba7c-47f1-926c-fbfe4ee59a3a" />
+
+<img width="1282" height="759" alt="Screenshot 2025-12-01 211633" src="https://github.com/user-attachments/assets/a5bccb39-946c-4a8e-b99b-72d17773a122" />
+
+<img width="1282" height="759" alt="Screenshot 2025-12-01 211602" src="https://github.com/user-attachments/assets/41ee3c23-23a0-49f4-b46b-cf2ca0f9cfac" />
 
 ---
 
 ## 🎬 Gameplay Video
 
-<!-- Add 30-second video here -->
-<!-- For YouTube use: -->
-<!-- [![Turtle Odyssey Gameplay](https://img.youtube.com/vi/VIDEO_ID/0.jpg)](https://www.youtube.com/watch?v=VIDEO_ID) -->
-
-**[Add Embedded Video Here]**
+https://github.com/user-attachments/assets/e23ae2ce-50a7-46ec-a645-17db11fb5b34
 
 ---
 
