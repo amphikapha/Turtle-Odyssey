@@ -894,21 +894,20 @@ if (player->position.z < lastCarSpawnZ - CAR_SPAWN_INTERVAL) {
 
         if (gameState == MENU) {
             // Start menu: only show small high score top-left (user requested only the score)
-            if (highScore > 0) {
-                textRenderer->RenderText("High Score: " + std::to_string(highScore * 2) + "m", 20.0f, 30.0f, 0.9f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
-            }
+            // Shift the text a bit to the right (20 -> 30)
+            textRenderer->RenderText("Best Score: " + std::to_string(highScore * 2) + " m", 30.0f, 30.0f, 0.6f, glm::vec3(0.0f, 0.5f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
         } else if (gameState == PLAYING) {
             // In-game HUD
-            textRenderer->RenderText("Distance: " + std::to_string(score * 2) + "m", 20.0f, 30.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+            textRenderer->RenderText("Distance: " + std::to_string(score * 2) + " m", 20.0f, 30.0f, 1.0f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
             textRenderer->RenderText("Lives: " + std::to_string(playerHearts), SCR_WIDTH - 250.0f, 30.0f, 1.0f, glm::vec3(1.0f, 0.3f, 0.3f), SCR_WIDTH, SCR_HEIGHT);
             textRenderer->RenderText("Potions: " + std::to_string(player->potionCount), SCR_WIDTH - 250.0f, 90.0f, 1.0f, glm::vec3(1.0f, 0.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
         } else if (gameState == GAME_OVER) {
             // Game over screen - only render dynamic scores (distance and high-score)
-            std::string distanceStr = std::to_string(score * 2) + "m";
-            textRenderer->RenderText(distanceStr, SCR_WIDTH / 2 - 100.0f, 260.0f, 2.2f, glm::vec3(1.0f, 1.0f, 1.0f), SCR_WIDTH, SCR_HEIGHT);
+            std::string distanceStr = "Your Score: " + std::to_string(score * 2) + " m";
+            textRenderer->RenderText(distanceStr, SCR_WIDTH / 2 - 240.0f, 210.0f, 1.3f, glm::vec3(0.0f, 0.5f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
 
-            std::string hsStr = "High Score: " + std::to_string(highScore * 2) + "m";
-            textRenderer->RenderText(hsStr, SCR_WIDTH / 2 - 140.0f, 340.0f, 1.2f, glm::vec3(1.0f, 0.84f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
+            std::string hsStr = "Best Score: " + std::to_string(highScore * 2) + " m";
+            textRenderer->RenderText(hsStr, SCR_WIDTH / 2- 160.0f, 300.0f, 0.8f, glm::vec3(0.0f, 0.0f, 0.0f), SCR_WIDTH, SCR_HEIGHT);
         }
 
         glDisable(GL_BLEND);
